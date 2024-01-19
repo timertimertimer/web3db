@@ -18,7 +18,7 @@ class Discord(EmailRelationMixin, Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     login: Mapped[str] = mapped_column(String, unique=True)
     password: Mapped[str] = mapped_column(String)
-    token: Mapped[str] = mapped_column(String, unique=True)
+    auth_token: Mapped[str] = mapped_column(String, unique=True)
 
     profile: Mapped['Profile'] = relationship(back_populates='discord')
 
