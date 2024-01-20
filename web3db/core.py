@@ -5,7 +5,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 
 from web3db.models import *
-from web3db.utils import logger
+from web3db.utils import logger, DEFAULT_UA
 from web3db.utils.encrypt_private import encrypt
 
 
@@ -51,7 +51,7 @@ class DBHelper:
                 await session.execute(select(table).where(table.login == login))).first()
             return result[0] if result else None
 
-    async def add_email(self, login: str, password: str):
+    async def add_email(self, login: str, password: str) -> None:
         logger.info(f'adding Email {login}:{password}')
         await self._add_record(Email(login=login, password=password))
 
@@ -62,7 +62,7 @@ class DBHelper:
             password: str = None,
             email: str = None,
             email_password: str = None
-    ):
+    ) -> None:
         logger.info(f'adding Twitter {auth_token}')
         mail = (await self._check_record(email, Email)
                 or Email(login=email, password=email_password)) if email else None
@@ -81,10 +81,10 @@ class DBHelper:
             login: str = None,
             password: str = None,
             email_password: str = None
-    ):
+    ) -> None:
         logger.info(f'Adding Discord {auth_token}')
-        email = (await self._check_record(login, Email)) or Email(login=login,
-                                                                  password=email_password) if login else None
+        email = ((await self._check_record(login, Email))
+                 or Email(login=login, password=email_password)) if login else None
         await self._add_record(
             Discord(
                 login=login,
@@ -94,7 +94,7 @@ class DBHelper:
             )
         )
 
-    async def add_proxy(self, proxy_string: str):
+    async def add_proxy(self, proxy_string: str) -> None:
         logger.info(f'Adding Proxy {proxy_string}')
         await self._add_record(Proxy(proxy_string=proxy_string))
 
@@ -105,8 +105,8 @@ class DBHelper:
             discord_login: str,
             twitter_login: str,
             evm_private_encoded: str,
-            user_agent: str = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    ):
+            user_agent: str = DEFAULT_UA,
+    ) -> None:
         logger.info(f'Adding Profile {email}:{proxy_string}')
         mail = await self._check_record(email, Email)
         if not mail:
@@ -128,75 +128,37 @@ class DBHelper:
             Profile(
                 user_agent=user_agent,
                 proxy=proxy,
-                mail=mail,
+                email=email,
                 discord=discord,
                 twitter=twitter,
                 evm_private=evm_private_encoded
             )
         )
 
-    async def edit_profile(self, edited_profile: Profile):
-        logger.info(f'Editing {edited_profile.id} profile')
-        return await self._add_record(edited_profile)
+    async def edit(self, edited_table: Twitter | Discord | Email | Profile | Proxy) -> None:
+        logger.info(f'Editing {edited_table.id} profile')
+        await self._add_record(edited_table)
 
-    async def delete_row(self, account: Twitter | Discord | Email | Profile | Proxy):
-        logger.info(f'Deleting {account}')
-        async with self.session_factory() as session:
-            await (await session.connection()).run_sync(Base.metadata.reflect)
-            table = Table(account.__tablename__, Base.metadata)
-            query = delete(table).where(account.id == table.c.id)
-            await session.execute(query)
+    async def delete(self, table: Twitter | Discord | Email | Profile | Proxy) -> None:
+        logger.info(f'Deleting {table.__tablename__}')
+        query = delete(type(table)).where(table.id == type(table).id)
+        await self._exec_stmt(query)
 
-    async def get_all_rows(self, table: Twitter | Discord | Email | Profile | Proxy) -> list:
+    async def get_all_from_table(self, table) -> Sequence[Profile]:
         logger.info(f'Getting all {table.__tablename__}')
-        query = select(table)
-        result = await self._exec_stmt(query)
-        logger.info(f'got {table.__tablename__}')
-        return [row for row in result.scalars()]
-
-    async def get_all_profiles(self):
-        logger.info('Getting profiles')
-        query = (
-            select(Profile)
-            .order_by(Profile.id)
-            .options(
-                joinedload(Profile.email),
-                joinedload(Profile.proxy),
-                joinedload(Profile.discord).joinedload(Discord.email),
-                joinedload(Profile.twitter).joinedload(Twitter.email)
-            )
-        )
+        query = select(table).options(joinedload('*'))
         result = await self._exec_stmt(query)
         return result.scalars().all()
 
     async def get_profile_by_id(self, id_: int) -> Profile:
         logger.info(f'Getting {id_} profile')
-        query = (
-            select(Profile)
-            .where(Profile.id == id_)
-            .options(
-                joinedload(Profile.proxy),
-                joinedload(Profile.email),
-                joinedload(Profile.discord).joinedload(Discord.email),
-                joinedload(Profile.twitter).joinedload(Twitter.email),
-            )
-        )
+        query = select(Profile).where(Profile.id == id_).options(joinedload('*'))
         result = await self._exec_stmt(query)
         return result.scalars().first()
 
     async def get_profiles_by_id(self, ids: list[int]) -> Sequence[Profile]:
         logger.info(f'Getting profiles by id')
-        query = (
-            select(Profile)
-            .filter(Profile.id.in_(ids))
-            .order_by(Profile.id)
-            .options(
-                joinedload(Profile.proxy),
-                joinedload(Profile.email),
-                joinedload(Profile.discord).joinedload(Discord.email),
-                joinedload(Profile.twitter).joinedload(Twitter.email)
-            )
-        )
+        query = select(Profile).filter(Profile.id.in_(ids)).order_by(Profile.id).options(joinedload('*'))
         result = await self._exec_stmt(query)
         return result.scalars().all()
 
@@ -219,62 +181,26 @@ class DBHelper:
 
     async def get_profile_by_twitter_login(self, login: str) -> Profile:
         logger.info(f'Getting twitter {login}')
-        query = (
-            select(Profile)
-            .options(
-                joinedload(Profile.proxy),
-                joinedload(Profile.email),
-                joinedload(Profile.discord).joinedload(Discord.email),
-                joinedload(Profile.twitter).joinedload(Twitter.email)
-            )
-            .where(Profile.twitter.has(Twitter.login == login))
-        )
+        query = select(Profile).where(Profile.twitter.has(Twitter.login == login)).options(joinedload('*'))
         result = await self._exec_stmt(query)
         return result.scalars().first()
 
     async def get_profile_by_discord_login(self, login: str) -> Profile:
         logger.info(f'Getting discord {login}')
-        query = (
-            select(Profile)
-            .options(
-                joinedload(Profile.proxy),
-                joinedload(Profile.email),
-                joinedload(Profile.discord).joinedload(Discord.email),
-                joinedload(Profile.twitter).joinedload(Twitter.email)
-            )
-            .where(Profile.discord.has(Discord.login == login))
-        )
+        query = select(Profile).where(Profile.discord.has(Discord.login == login)).options(joinedload('*'))
         result = await self._exec_stmt(query)
         return result.scalars().first()
 
-    async def get_random_profile(self):
+    async def get_random_profile(self) -> Profile:
         logger.info(f'Getting random profile')
-        query = (
-            select(Profile)
-            .order_by(func.random())
-            .options(
-                joinedload(Profile.proxy),
-                joinedload(Profile.email),
-                joinedload(Profile.discord).joinedload(Discord.email),
-                joinedload(Profile.twitter).joinedload(Twitter.email)
-            )
-        )
+        query = select(Profile).order_by(func.random()).options(joinedload('*'))
         result = await self._exec_stmt(query)
         return result.scalars().first()
 
     async def get_random_profiles_by_proxy_distinct(self) -> Sequence[Profile]:
         logger.info(f'Getting random profiles by proxy distinct')
-        query = (
-            select(Profile).join(Profile.proxy)
-            .options(
-                joinedload(Profile.proxy),
-                joinedload(Profile.email),
-                joinedload(Profile.discord).joinedload(Discord.email),
-                joinedload(Profile.twitter).joinedload(Twitter.email)
-            )
-            .distinct(Proxy.proxy_string)
-            .order_by(Proxy.proxy_string, func.random())
-        )
+        query = (select(Profile).join(Profile.proxy).distinct(Proxy.proxy_string)
+                 .order_by(Proxy.proxy_string, func.random()).options(joinedload('*')))
         result = await self._exec_stmt(query)
         return result.scalars().all()
 
@@ -282,62 +208,69 @@ class DBHelper:
         logger.info(f'Getting random profiles by proxy distinct (light with social)')
         match social:
             case 'twitter':
-                query = select(Profile.id, Twitter.login, Profile.proxy.proxy_string).join(Profile.twitter).join(
-                    Profile.proxy)
+                query = (select(Profile.id, Twitter.login, Profile.proxy.proxy_string)
+                         .join(Profile.twitter).join(Profile.proxy))
             case 'discord':
-                query = select(Profile.id, Discord.login, Profile.proxy.proxy_string).join(Profile.discord).join(
-                    Profile.proxy)
+                query = (select(Profile.id, Discord.login, Profile.proxy.proxy_string)
+                         .join(Profile.discord).join(Profile.proxy))
             case _:
                 query = ()
-        query = query.distinct(Profile.proxy.proxy_string).order_by(Profile.proxy.proxy_string, func.random()).subquery(
-            'random_proxy_profiles')
+        query = (
+            query.distinct(Profile.proxy.proxy_string)
+            .order_by(Profile.proxy.proxy_string, func.random())
+            .subquery('random_proxy_profiles')
+        )
         query = select(query).order_by(query.c.id)
         result = await self._exec_stmt(query)
         return [tuple(el) for el in result.all()]
 
-    async def get_all_from_table(self, table: Twitter | Discord | Proxy | Email | Profile):
-        logger.info(f'Getting all twitters')
-        query = select(Twitter).options(joinedload(Twitter.email))
-        result = await self._exec_stmt(query)
-        return result.scalars().all()
+    async def get_potential_profiles(self, n: int = None) -> list[Profile]:
+        free_proxies = (await self.get_free_proxies(limit=n))
+        free_emails = (await self.get_free_emails(limit=n))
+        free_discords = (await self.get_free_discords(limit=n))
+        free_twitters = (await self.get_free_twitters(limit=n))
+        return [
+            Profile(email=free_email, proxy=free_proxy, discord=free_discord, twitter=free_twitter)
+            for free_email, free_proxy, free_discord, free_twitter in
+            zip(free_emails, free_proxies, free_discords, free_twitters)
+        ]
 
-    async def get_free_mails(self):
+    async def get_free_emails(self, limit: int = None) -> Sequence[Email]:
         logger.info(f'Getting free mails')
         subquery = (
             select(Twitter.email_id)
             .where(Twitter.email_id.isnot(None))
             .union(select(Profile.email_id).where(Profile.email_id.isnot(None)))
         )
-        query = (
-            select(Email)
-            .where(
-                and_(
-                    ~Email.id.in_(subquery),
-                    not_(Email.login.ilike('%.ru'))
-                )
-            )
-        )
+        query = select(Email).where(and_(~Email.id.in_(subquery), not_(Email.login.ilike('%.ru')))).limit(limit)
         result = await self._exec_stmt(query)
         return result.scalars().all()
 
-    async def get_free_discords(self):
+    async def get_free_discords(self, limit: int = None) -> Sequence[Discord]:
         logger.info(f'Getting free discords')
         query = select(Discord).where(
             ~Discord.id.in_(
                 select(Profile.discord_id).where(Profile.discord_id.isnot(None))
             )
-        )
+        ).limit(limit)
         result = await self._exec_stmt(query)
         return result.scalars().all()
 
-    async def get_free_twitters(self):
+    async def get_free_twitters(self, limit: int = None) -> Sequence[Twitter]:
         logger.info(f'Getting free twitters')
-        query = select(Twitter).where(~Twitter.id.in_(select(Profile.twitter_id))).options(joinedload(Twitter.email))
+        query = (select(Twitter).where(~Twitter.id.in_(select(Profile.twitter_id)))
+                 .options(joinedload(Twitter.email)).limit(limit))
+        result = await self._exec_stmt(query)
+        return result.scalars().all()
+
+    async def get_free_proxies(self, limit: int = None) -> Sequence[Proxy]:
+        logger.info(f'Getting free twitters')
+        query = select(Proxy).where(~Proxy.id.in_(select(Profile.proxy_id))).limit(limit)
         result = await self._exec_stmt(query)
         return result.scalars().all()
 
 
-async def add_encrypted_private_to_profile(db: DBHelper, id_: int, private_key: str, recipient: str):
+async def add_encrypted_private_to_profile(db: DBHelper, id_: int, private_key: str, recipient: str) -> None:
     profile: Profile = await db.get_profile_by_id(id_)
     profile.evm_private = encrypt(private_key, recipient)
-    await db.edit_profile(profile)
+    await db.edit(profile)

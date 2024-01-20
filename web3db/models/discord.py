@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 class Discord(EmailRelationMixin, Base):
     __tablename__ = 'discords'
-    _email_id_nullable = True
+    _email_id_nullable = False
     _email_back_populates = 'discord'
 
     id: Mapped[int] = mapped_column(primary_key=True)
