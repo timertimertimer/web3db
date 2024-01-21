@@ -1,7 +1,7 @@
 import random
 
 from eth_account import Account
-from sqlalchemy import Result, func, Sequence, delete, and_, not_, Table, desc
+from sqlalchemy import Result, func, Sequence, delete, and_, not_, Table, desc, distinct
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy.future import select
@@ -168,18 +168,9 @@ class DBHelper:
         result = await self._exec_stmt(query)
         return result.scalars().all()
 
-    async def get_profiles_by_id_light(self, social: str, ids: list[int] = None) -> list:
+    async def get_profiles_by_id_light(self, model, ids: list[int] = None) -> list:
         logger.info(f'Getting profiles by id (light with social)')
-        match social:
-            case 'twitter':
-                query = select(Profile.id, Twitter.login, Profile.proxy.proxy_string).join(Profile.twitter).join(
-                    Profile.proxy)
-            case 'discord':
-                query = select(Profile.id, Discord.login, Profile.proxy.proxy_string).join(Profile.discord).join(
-                    Profile.proxy)
-            case _:
-                query = ()
-        query = query.order_by(Profile.id)
+        query = select(Profile.id, model.login, Proxy.proxy_string).join(model).join(Proxy).order_by(Profile.id)
         if ids:
             query = query.filter(Profile.id.in_(ids))
         result = await self._exec_stmt(query)
@@ -205,28 +196,13 @@ class DBHelper:
 
     async def get_random_profiles_by_proxy_distinct(self) -> Sequence[Profile]:
         logger.info(f'Getting random profiles by proxy distinct')
-        query = (select(Profile).join(Profile.proxy).distinct(Proxy.proxy_string)
-                 .order_by(Proxy.proxy_string, func.random()).options(joinedload('*')))
+        query = select(Profile).distinct(Profile.proxy_id).options(joinedload('*'))
         result = await self._exec_stmt(query)
         return result.scalars().all()
 
-    async def get_random_profiles_by_proxy_distinct_light(self, social: str) -> list:
+    async def get_random_profiles_by_proxy_distinct_light(self, model) -> list:
         logger.info(f'Getting random profiles by proxy distinct (light with social)')
-        match social:
-            case 'twitter':
-                query = (select(Profile.id, Twitter.login, Profile.proxy.proxy_string)
-                         .join(Profile.twitter).join(Profile.proxy))
-            case 'discord':
-                query = (select(Profile.id, Discord.login, Profile.proxy.proxy_string)
-                         .join(Profile.discord).join(Profile.proxy))
-            case _:
-                query = ()
-        query = (
-            query.distinct(Profile.proxy.proxy_string)
-            .order_by(Profile.proxy.proxy_string, func.random())
-            .subquery('random_proxy_profiles')
-        )
-        query = select(query).order_by(query.c.id)
+        query = select(Profile.id, model.login, Proxy.proxy_string).join(model).join(Proxy).distinct(Proxy.proxy_string)
         result = await self._exec_stmt(query)
         return [tuple(el) for el in result.all()]
 
