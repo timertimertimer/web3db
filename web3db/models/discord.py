@@ -23,7 +23,7 @@ class Discord(EmailRelationMixin, Base):
     profile: Mapped['Profile'] = relationship(back_populates='discord')
 
     def __repr__(self):
-        return f'{self.id}:{self.login}:{self.password}:{self.token}'
+        return f'{self.id}:{self.login}:{self.password}:{self.auth_token}'
 
     def __str__(self):
         return repr(self)

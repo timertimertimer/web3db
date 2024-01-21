@@ -2,3 +2,4 @@ python-gnupg
 loguru
 sqlalchemy
 asyncpg
+eth_account

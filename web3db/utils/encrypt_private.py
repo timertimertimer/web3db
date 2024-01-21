@@ -6,12 +6,12 @@ gpg = gnupg.GPG()
 gpg.encoding = 'utf-8'
 
 
-def encrypt(data: str, recipient: str) -> str:
+def encrypt(data: str, recipient: str, passphrase: str) -> str:
     status = gpg.encrypt(
         data=data,
         recipients=recipient,
-        sign=recipient,
-        always_trust=True
+        passphrase=passphrase,
+        sign=recipient
     )
     logger.info(status.status)
     return status.data.decode('utf-8')

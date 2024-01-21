@@ -11,7 +11,7 @@ setup(
     author_email="timerkhan2002@gmail.com",
     description='Web3 database',
     packages=find_packages(),
-    install_requires=['python-gnupg', 'loguru', 'sqlalchemy', 'asyncpg'],
+    install_requires=['python-gnupg', 'loguru', 'sqlalchemy', 'asyncpg', 'eth_account'],
     keywords=['web3', 'database', 'db', 'twitter', 'discord'],
     classifiers=[
         "Intended Audience :: Developers",
