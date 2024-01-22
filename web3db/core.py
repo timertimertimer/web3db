@@ -1,7 +1,7 @@
 import random
 
 from eth_account import Account
-from sqlalchemy import Result, func, Sequence, delete, and_, not_, Table, desc, distinct
+from sqlalchemy import Result, func, Sequence, delete, and_, not_, desc
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy.future import select
@@ -163,7 +163,7 @@ class DBHelper:
         return result.scalars().first()
 
     async def get_rows_by_id(self, ids: list[int], model) -> Sequence[Email | Twitter | Discord | Proxy | Profile]:
-        logger.info(f'Getting rows with {", ".join(ids)} ids from {model.__tablename__} table')
+        logger.info(f'Getting rows with {", ".join(map(str, ids))} ids from {model.__tablename__} table')
         query = select(model).filter(model.id.in_(ids)).order_by(model.id).options(joinedload('*'))
         result = await self._exec_stmt(query)
         return result.scalars().all()
