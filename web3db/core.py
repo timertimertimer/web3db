@@ -150,9 +150,9 @@ class DBHelper:
         query = delete(type(model)).where(model.id == type(model).id)
         await self._exec_stmt(query)
 
-    async def get_all_from_table(self, model):
+    async def get_all_from_table(self, model, limit: int = None):
         logger.info(f'Getting all rows from {model.__tablename__} table')
-        query = select(model).options(joinedload('*'))
+        query = select(model).options(joinedload('*')).limit(limit)
         result = await self._exec_stmt(query)
         return result.scalars().all()
 
@@ -194,20 +194,21 @@ class DBHelper:
         result = await self._exec_stmt(query)
         return result.scalars().first()
 
-    async def get_random_profiles_by_proxy_distinct(self) -> Sequence[Profile]:
+    async def get_random_profiles_by_proxy_distinct(self, limit: int = None) -> Sequence[Profile]:
         logger.info(f'Getting random profiles by proxy distinct')
-        query = select(Profile).distinct(Profile.proxy_id).options(joinedload('*'))
+        query = select(Profile).distinct(Profile.proxy_id).options(joinedload('*')).limit(limit)
         result = await self._exec_stmt(query)
         return result.scalars().all()
 
-    async def get_random_profiles_by_proxy_distinct_light(self, model) -> list:
+    async def get_random_profiles_by_proxy_distinct_light(self, model, limit: int = None) -> list:
         logger.info(f'Getting random profiles by proxy distinct (light with social)')
-        query = select(Profile.id, model.login, Proxy.proxy_string).join(model).join(Proxy).distinct(Proxy.proxy_string)
+        query = select(Profile.id, model.login, Proxy.proxy_string).join(model).join(Proxy).distinct(
+            Proxy.proxy_string).limit(limit)
         result = await self._exec_stmt(query)
         return [tuple(el) for el in result.all()]
 
     async def get_potential_profiles(self, limit: int = None, n_for_proxy: int = 3) -> list[Profile]:
-        free_proxies = await self.get_free_proxies(limit=limit)
+        free_proxies = await self.get_free_proxies(limit=limit, n_for_proxy=n_for_proxy)
         free_proxies_count = sum([el[-1] for el in free_proxies])
         free_emails = await self.get_free_emails(limit=limit or free_proxies_count)
         free_discords = await self.get_free_discords(limit=limit or min(len(free_emails), free_proxies_count))
@@ -215,16 +216,17 @@ class DBHelper:
             limit=limit or min(len(free_emails), len(free_discords), free_proxies_count)
         )
         free_proxies_all = []
-        for proxy, n in free_proxies:
-            free_proxies_all += [proxy] * n
+        for free_proxy, n in free_proxies:
+            free_proxies_all += [free_proxy] * n
         random.shuffle(free_proxies_all)
         potential_profiles = []
-        for email, discord, twitter, proxy in zip(free_emails, free_discords, free_twitters, free_proxies_all):
+        for free_email, free_discord, free_twitter, free_proxy \
+                in zip(free_emails, free_discords, free_twitters, free_proxies_all):
             potential_profiles.append(Profile(
-                proxy=proxy,
-                email=email,
-                discord=discord,
-                twitter=twitter
+                email=free_email,
+                discord=free_discord,
+                twitter=free_twitter,
+                proxy=free_proxy
             ))
         return potential_profiles
 
@@ -287,7 +289,10 @@ class DBHelper:
         return result.all()
 
 
-async def add_encrypted_private_to_profile(db: DBHelper, id_: int, private_key: str, recipient: str) -> None:
-    profile: Profile = await db.g(id_)
-    profile.evm_private = encrypt(private_key, recipient)
-    await db.edit(profile)
+async def add_encrypted_private_to_profile(
+        db: DBHelper, id_: int, private_key: str,
+        recipient: str, passphrase: str
+) -> None:
+    existing_profile: Profile = await db.get_row_by_id(id_, Profile)
+    existing_profile.evm_private = encrypt(private_key, recipient, passphrase)
+    await db.edit(existing_profile)
