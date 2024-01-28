@@ -17,7 +17,7 @@ class Profile(EmailRelationMixin, TwitterRelationMixin, DiscordRelationMixin, Pr
 
     def __repr__(self):
         return (f'{self.id}:{self.email.login}:{self.twitter.login}:{self.discord.login}:'
-                f'{self.proxy.proxy_string if self.proxy else None}:{self.user_agent}')
+                f'{self.proxy.proxy_string if self.proxy else None}')
 
     def __str__(self):
         return repr(self)

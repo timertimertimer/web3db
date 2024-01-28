@@ -288,7 +288,7 @@ class DBHelper:
 
     async def get_free_twitters(self, limit: int = None) -> Sequence[Twitter]:
         logger.info(f'Getting free twitters')
-        query = (select(Twitter).where(~Twitter.id.in_(select(Profile.twitter_id)))
+        query = (select(Twitter).where(~Twitter.id.in_(select(Profile.twitter_id))).order_by(Twitter.id)
                  .options(joinedload(Twitter.email)).limit(limit))
         result = await self._exec_stmt(query)
         return result.scalars().all()
