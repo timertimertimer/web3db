@@ -13,7 +13,6 @@ class Profile(EmailRelationMixin, TwitterRelationMixin, DiscordRelationMixin, Pr
     _proxy_back_populates = 'profile'
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_agent: Mapped[str] = mapped_column(String)
     evm_private: Mapped[str] = mapped_column(String)
 
     def __repr__(self):

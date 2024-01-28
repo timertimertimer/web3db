@@ -111,7 +111,6 @@ class DBHelper:
             discord_login: str,
             twitter_login: str,
             evm_private_encoded: str,
-            user_agent: str = DEFAULT_UA,
     ) -> None:
         logger.info(f'Adding Profile {email}:{proxy_string}')
         mail = await self._check_record(email, Email)
@@ -132,7 +131,6 @@ class DBHelper:
             return
         await self._add_record(
             Profile(
-                user_agent=user_agent,
                 proxy=proxy,
                 email=email,
                 discord=discord,
@@ -253,7 +251,6 @@ class DBHelper:
             recipient: str,
             passphrase: str,
             evm_privates=None,
-            user_agent: str = DEFAULT_UA,
             limit: int = None,
             n_for_proxy: int = 3
     ) -> list[Profile]:
@@ -265,7 +262,6 @@ class DBHelper:
                 profile.evm_private = encrypt(evm_privates[i], recipient, passphrase)
             else:
                 profile.evm_private = encrypt(Account.create().key.hex(), recipient, passphrase)
-            profile.user_agent = user_agent
         result = await self._add_record(potential_profiles)
         return result
 
