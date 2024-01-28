@@ -196,7 +196,25 @@ class DBHelper:
 
     async def get_random_profiles_by_proxy_distinct(self, limit: int = None) -> Sequence[Profile]:
         logger.info(f'Getting random profiles by proxy distinct')
-        query = select(Profile).distinct(Profile.proxy_id).options(joinedload('*')).limit(limit)
+        subquery = (
+            select(
+                func.row_number().over(
+                    partition_by=Profile.proxy_id,
+                    order_by=Profile.id
+                ).label('row_num'),
+                Profile
+            )
+            .distinct(Profile.proxy_id)
+            .alias('subq')
+        )
+        query = (
+            select(Profile)
+            .join(subquery, Profile.id == subquery.c.id)
+            .options(joinedload('*'))
+            .where(subquery.c.row_num == 1)
+            .order_by(Profile.id)
+            .limit(limit)
+        )
         result = await self._exec_stmt(query)
         return result.scalars().all()
 
