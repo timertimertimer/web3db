@@ -186,6 +186,22 @@ class DBHelper:
         result = await self._exec_stmt(query)
         return result.scalars().first()
 
+    async def get_first_profiles_by_proxy(self) -> list[Profile]:
+        logger.info(f'Getting first profiles by proxy')
+        subquery = select(
+            func.row_number().over(partition_by=Profile.proxy_id, order_by=Profile.id).label('rn'),
+            Profile
+        ).alias('subquery')
+        query = (
+            select(Profile)
+            .join(subquery, subquery.c.id == Profile.id)
+            .where(subquery.c.rn == 1)
+            .order_by(Profile.proxy_id, Profile.id)
+            .options(joinedload('*'))
+        )
+        result = await self._exec_stmt(query)
+        return result.scalars().all()
+
     async def get_random_profile(self) -> Profile:
         logger.info(f'Getting random profile')
         query = select(Profile).order_by(func.random()).options(joinedload('*'))
@@ -203,7 +219,7 @@ class DBHelper:
                 Profile
             )
             .distinct(Profile.proxy_id)
-            .alias('subq')
+            .alias('subquery')
         )
         query = (
             select(Profile)
