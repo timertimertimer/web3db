@@ -186,7 +186,7 @@ class DBHelper:
         result = await self._exec_stmt(query)
         return result.scalars().first()
 
-    async def get_first_profiles_by_proxy(self) -> list[Profile]:
+    async def get_first_profiles_by_proxy(self, limit: int = None) -> list[Profile]:
         logger.info(f'Getting first profiles by proxy')
         subquery = select(
             func.row_number().over(partition_by=Profile.proxy_id, order_by=Profile.id).label('rn'),
@@ -198,6 +198,7 @@ class DBHelper:
             .where(subquery.c.rn == 1)
             .order_by(Profile.proxy_id, Profile.id)
             .options(joinedload('*'))
+            .limit(limit)
         )
         result = await self._exec_stmt(query)
         return result.scalars().all()
