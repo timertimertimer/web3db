@@ -8,7 +8,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 
 from web3db.models import *
-from web3db.utils import logger, DEFAULT_UA
+from web3db.utils import logger
 from web3db.utils.encrypt_private import encrypt
 
 
@@ -23,10 +23,10 @@ class DBHelper:
             expire_on_commit=False
         )
 
-    async def _add_record(
+    async def add_record(
             self,
-            record: Email | Discord | Twitter | Profile | Proxy | list
-    ) -> Email | Discord | Twitter | Profile | Proxy | None:
+            record: Email | Discord | Twitter | Profile | Proxy | Github | list
+    ) -> Email | Discord | Twitter | Profile | Proxy | Github | None:
         logger.info(record)
         async with self.session_factory() as session:
             try:
@@ -46,20 +46,24 @@ class DBHelper:
     ) -> Result:
         logger.info(stmt)
         async with self.session_factory() as session:
-            result = await session.execute(stmt)
+            if not isinstance(stmt, list):
+                stmt = [stmt]
+            for s in stmt:
+                result = await session.execute(s)
             await session.commit()
             return result
 
-    async def _check_record(self, login: str, model) -> Email | Twitter | Discord | Proxy | None:
-        async with self.session_factory() as session:
-            result = (await session.execute(
-                select(model).where(model.proxy_string == login))).first() if model == Proxy else (
-                await session.execute(select(model).where(model.login == login))).first()
-            return result[0] if result else None
+    async def get_row_by_login(self, login: str, model) -> Email | Twitter | Discord | Proxy | None:
+        if model == Proxy:
+            query = select(model).where(model.proxy_string == login).options(joinedload('*'))
+        else:
+            query = select(model).where(model.login == login).options(joinedload('*'))
+        result = await self._exec_stmt(query)
+        return result.scalars().first()
 
     async def add_email(self, login: str, password: str) -> None:
         logger.info(f'Adding Email {login}:{password}')
-        await self._add_record(Email(login=login, password=password))
+        await self.add_record(Email(login=login, password=password))
 
     async def add_twitter(
             self,
@@ -70,9 +74,9 @@ class DBHelper:
             email_password: str = None
     ) -> None:
         logger.info(f'Adding Twitter {auth_token}')
-        mail = (await self._check_record(email, Email)
+        mail = (await self.get_row_by_login(email, Email)
                 or Email(login=email, password=email_password)) if email else None
-        await self._add_record(
+        await self.add_record(
             Twitter(
                 login=login,
                 password=password,
@@ -89,9 +93,9 @@ class DBHelper:
             email_password: str = None
     ) -> None:
         logger.info(f'Adding Discord {auth_token}')
-        email = ((await self._check_record(login, Email))
+        email = ((await self.get_row_by_login(login, Email))
                  or Email(login=login, password=email_password)) if login else None
-        await self._add_record(
+        await self.add_record(
             Discord(
                 login=login,
                 password=password,
@@ -102,7 +106,12 @@ class DBHelper:
 
     async def add_proxy(self, proxy_string: str) -> None:
         logger.info(f'Adding Proxy {proxy_string}')
-        await self._add_record(Proxy(proxy_string=proxy_string))
+        await self.add_record(Proxy(proxy_string=proxy_string))
+
+    async def add_github(self, login: str, password: str, email_password: str = None):
+        logger.info(f'Adding Github {login}')
+        email = (await self.get_row_by_login(login=login, model=Email)) or Email(login=login, password=email_password)
+        await self.add_record(Github(login=login, password=password, email=email))
 
     async def add_profile(
             self,
@@ -113,23 +122,23 @@ class DBHelper:
             evm_private_encoded: str,
     ) -> None:
         logger.info(f'Adding Profile {email}:{proxy_string}')
-        mail = await self._check_record(email, Email)
+        mail = await self.get_row_by_login(email, Email)
         if not mail:
             logger.error(f'Need email {email}')
             return
-        discord = await self._check_record(discord_login, Discord)
+        discord = await self.get_row_by_login(discord_login, Discord)
         if not discord:
             logger.error(f'Need discord {discord_login}')
             return
-        twitter = await self._check_record(twitter_login, Twitter)
+        twitter = await self.get_row_by_login(twitter_login, Twitter)
         if not twitter:
             logger.error(f'Need twitter {twitter_login}')
             return
-        proxy = await self._check_record(proxy_string, Proxy)
+        proxy = await self.get_row_by_login(proxy_string, Proxy)
         if not proxy:
             logger.error(f'Need proxy {proxy_string}')
             return
-        await self._add_record(
+        await self.add_record(
             Profile(
                 proxy=proxy,
                 email=email,
@@ -139,9 +148,12 @@ class DBHelper:
             )
         )
 
-    async def edit(self, edited_model: Twitter | Discord | Email | Profile | Proxy) -> None:
-        logger.info(f'Editing row with {edited_model.id} id from {edited_model.__tablename__} table')
-        await self._add_record(edited_model)
+    async def edit(self, edited_model: Twitter | Discord | Email | Profile | Proxy | list) -> None:
+        if isinstance(edited_model, list):
+            logger.info(f'Editing rows in {edited_model[0].__tablename__} table')
+        else:
+            logger.info(f'Editing row with {edited_model.id} id in {edited_model.__tablename__} table')
+        await self.add_record(edited_model)
 
     async def delete(self, model) -> None:
         logger.info(f'Deleting row with {model.id} id from {model.__tablename__} table')
@@ -202,6 +214,12 @@ class DBHelper:
         )
         result = await self._exec_stmt(query)
         return result.scalars().all()
+
+    async def get_first_profiles_by_proxy_light(self, model, limit: int = None):
+        logger.info(f'Getting first profiles by proxy (light with social)')
+        query = select(Profile.id, model.login, Proxy.proxy_string).join(model).join(Proxy).limit(limit)
+        result = await self._exec_stmt(query)
+        return [tuple(el) for el in result.all()]
 
     async def get_random_profile(self) -> Profile:
         logger.info(f'Getting random profile')
@@ -279,7 +297,7 @@ class DBHelper:
                 profile.evm_private = encrypt(evm_privates[i], recipient, passphrase)
             else:
                 profile.evm_private = encrypt(Account.create().key.hex(), recipient, passphrase)
-        result = await self._add_record(potential_profiles)
+        result = await self.add_record(potential_profiles)
         return result
 
     async def get_free_emails(self, limit: int = None) -> Sequence[Email]:
@@ -318,6 +336,9 @@ class DBHelper:
         )
         result = await self._exec_stmt(query)
         return result.all()
+
+    async def change_twitter(self, profile_id: int, delete_twitter: bool = False, delete_email: bool = False) -> None:
+        logger.info(f'changing twitter for {profile_id} profile')
 
 
 async def add_encrypted_private_to_profile(

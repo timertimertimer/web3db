@@ -19,9 +19,10 @@ def encrypt(data: str, recipient: str, passphrase: str) -> str:
     return status.data.decode('utf-8')
 
 
-def decrypt(encoded_data: str, passphrase: str) -> str:
+def decrypt(encoded_data: str, passphrase: str, echo: bool = False) -> str:
     status = gpg.decrypt(encoded_data, passphrase=passphrase)
-    logger.info(status.status)
+    if echo:
+        logger.info(status.status)
     return status.data.decode('utf-8')
 
 

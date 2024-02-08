@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from .email import Email
     from .twitter import Twitter
     from .proxy import Proxy
+    from .github import Github
 
 
 class EmailRelationMixin:
@@ -56,7 +57,7 @@ class TwitterRelationMixin:
 
 class ProxyRelationMixin:
     _proxy_id_nullable: bool = False
-    _proxy_id_back_populates: str = None
+    _proxy_back_populates: str = None
     _proxy_id_unique: bool = False
 
     @declared_attr
@@ -66,4 +67,19 @@ class ProxyRelationMixin:
 
     @declared_attr
     def proxy(cls) -> Mapped['Proxy']:
-        return relationship('Proxy', back_populates=cls._proxy_id_back_populates)
+        return relationship('Proxy', back_populates=cls._proxy_back_populates)
+
+
+class GithubRelationMixin:
+    _github_id_nullable: bool = True
+    _github_back_populates: str = None
+    _github_id_unique: bool = True
+
+    @declared_attr
+    def github_id(cls):
+        return mapped_column(ForeignKey('githubs.id'), nullable=cls._github_id_nullable,
+                             unique=cls._github_id_unique)
+
+    @declared_attr
+    def github(cls) -> Mapped['Github']:
+        return relationship('Github', back_populates=cls._github_back_populates)

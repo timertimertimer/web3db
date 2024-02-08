@@ -2,18 +2,33 @@ from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base
-from .mixins import EmailRelationMixin, TwitterRelationMixin, DiscordRelationMixin, ProxyRelationMixin
+from .mixins import (
+    EmailRelationMixin,
+    TwitterRelationMixin,
+    DiscordRelationMixin,
+    ProxyRelationMixin,
+    GithubRelationMixin
+)
 
 
-class Profile(EmailRelationMixin, TwitterRelationMixin, DiscordRelationMixin, ProxyRelationMixin, Base):
+class Profile(
+    EmailRelationMixin,
+    TwitterRelationMixin,
+    DiscordRelationMixin,
+    ProxyRelationMixin,
+    GithubRelationMixin,
+    Base
+):
     __tablename__ = 'profiles'
     _email_back_populates = 'profile'
     _twitter_back_populates = 'profile'
     _discord_back_populates = 'profile'
     _proxy_back_populates = 'profile'
+    _github_back_populates = 'profile'
 
     id: Mapped[int] = mapped_column(primary_key=True)
     evm_private: Mapped[str] = mapped_column(String)
+    aptos_private: Mapped[str] = mapped_column(String)
 
     def __repr__(self):
         return (f'{self.id}:{self.email.login}:{self.twitter.login}:{self.discord.login}:'
