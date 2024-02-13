@@ -29,6 +29,7 @@ class Profile(
     id: Mapped[int] = mapped_column(primary_key=True)
     evm_private: Mapped[str] = mapped_column(String)
     aptos_private: Mapped[str] = mapped_column(String)
+    solana_private: Mapped[str] = mapped_column(String, nullable=True)
 
     def __repr__(self):
         return (f'{self.id}:{self.email.login}:{self.twitter.login}:{self.discord.login}:'

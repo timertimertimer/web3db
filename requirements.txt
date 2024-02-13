@@ -1,5 +1,9 @@
-python-gnupg
+base58
 loguru
-sqlalchemy
+solana
 asyncpg
+aptos-sdk
+sqlalchemy
 eth_account
+eth_account
+python-gnupg

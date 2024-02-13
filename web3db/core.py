@@ -1,6 +1,9 @@
 import random
 
-from eth_account import Account
+import base58
+from eth_account import Account as EVMAccount
+from aptos_sdk.account import Account as AptosAccount
+from solders.keypair import Keypair
 from sqlalchemy import Result, func, Sequence, delete, and_, not_, desc
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
@@ -99,7 +102,7 @@ class DBHelper:
             Discord(
                 login=login,
                 password=password,
-                token=auth_token,
+                auth_token=auth_token,
                 email=email
             )
         )
@@ -120,6 +123,8 @@ class DBHelper:
             discord_login: str,
             twitter_login: str,
             evm_private_encoded: str,
+            aptos_private_encoded: str,
+            solana_private_encoded: str
     ) -> None:
         logger.info(f'Adding Profile {email}:{proxy_string}')
         mail = await self.get_row_by_login(email, Email)
@@ -144,7 +149,9 @@ class DBHelper:
                 email=email,
                 discord=discord,
                 twitter=twitter,
-                evm_private=evm_private_encoded
+                evm_private=evm_private_encoded,
+                aptos_private=aptos_private_encoded,
+                solana_private=solana_private_encoded
             )
         )
 
@@ -285,18 +292,18 @@ class DBHelper:
             self,
             recipient: str,
             passphrase: str,
-            evm_privates=None,
             limit: int = None,
             n_for_proxy: int = 3
     ) -> list[Profile]:
-        if evm_privates is None:
-            evm_privates = []
         potential_profiles = await self.get_potential_profiles(limit, n_for_proxy)
         for i, profile in enumerate(potential_profiles):
-            if i < len(evm_privates):
-                profile.evm_private = encrypt(evm_privates[i], recipient, passphrase)
-            else:
-                profile.evm_private = encrypt(Account.create().key.hex(), recipient, passphrase)
+            profile.evm_private = encrypt(EVMAccount.create().key.hex(), recipient, passphrase)
+            profile.aptos_private = encrypt(AptosAccount.generate().private_key.hex(), recipient, passphrase)
+            solana_keypair = Keypair()
+            profile.solana_private = encrypt(
+                base58.b58encode(solana_keypair.secret() + bytes(solana_keypair.pubkey())).decode(),
+                recipient, passphrase
+            )
         result = await self.add_record(potential_profiles)
         return result
 
@@ -339,12 +346,3 @@ class DBHelper:
 
     async def change_twitter(self, profile_id: int, delete_twitter: bool = False, delete_email: bool = False) -> None:
         logger.info(f'changing twitter for {profile_id} profile')
-
-
-async def add_encrypted_private_to_profile(
-        db: DBHelper, id_: int, private_key: str,
-        recipient: str, passphrase: str
-) -> None:
-    existing_profile: Profile = await db.get_row_by_id(id_, Profile)
-    existing_profile.evm_private = encrypt(private_key, recipient, passphrase)
-    await db.edit(existing_profile)
