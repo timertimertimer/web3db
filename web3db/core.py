@@ -4,7 +4,7 @@ import random
 import base58
 from eth_account import Account as EVMAccount
 from aptos_sdk.account import Account as AptosAccount
-from solders.keypair import Keypair
+from solana.rpc.api import Keypair
 from sqlalchemy import Result, func, Sequence, delete, and_, not_, desc
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker

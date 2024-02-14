@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from sqlalchemy import String
+from sqlalchemy import String, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
@@ -19,6 +19,7 @@ class Twitter(EmailRelationMixin, Base):
     login: Mapped[str] = mapped_column(String, unique=True)
     password: Mapped[str] = mapped_column(String)
     auth_token: Mapped[str] = mapped_column(String, unique=True)
+    ready: Mapped[bool] = mapped_column(Boolean, default=False)
 
     profile: Mapped['Profile'] = relationship(back_populates='twitter')
 
