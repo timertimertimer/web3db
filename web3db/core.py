@@ -1,4 +1,3 @@
-import os
 import random
 
 import base58
@@ -240,34 +239,47 @@ class DBHelper:
         result = await self._exec_stmt(query)
         return result.scalars().first()
 
-    async def get_random_profiles_by_proxy_distinct(self, limit: int = None) -> Sequence[Profile]:
-        logger.info(f'Getting random profiles by proxy distinct')
+    async def get_random_profiles_by_proxy(self, limit: int = None) -> Sequence[Profile]:
+        logger.info(f'Getting random profiles by proxy')
         subquery = (
             select(
                 func.row_number().over(
                     partition_by=Profile.proxy_id,
-                    order_by=Profile.id
-                ).label('row_num'),
+                    order_by=func.random()
+                ).label('rn'),
                 Profile
             )
-            .distinct(Profile.proxy_id)
             .alias('subquery')
         )
         query = (
             select(Profile)
-            .join(subquery, Profile.id == subquery.c.id)
+            .join(subquery, subquery.c.id == Profile.id)
+            .where(subquery.c.rn == 1)
             .options(joinedload('*'))
-            .where(subquery.c.row_num == 1)
-            .order_by(Profile.id)
             .limit(limit)
         )
         result = await self._exec_stmt(query)
         return result.scalars().all()
 
-    async def get_random_profiles_by_proxy_distinct_light(self, model, limit: int = None) -> list:
-        logger.info(f'Getting random profiles by proxy distinct (light with social)')
-        query = select(Profile.id, model.login).join(model).distinct(
-            Proxy.proxy_string).limit(limit)
+    async def get_random_profiles_by_proxy_light(self, model, limit: int = None) -> list:
+        logger.info(f'Getting random profiles by proxy (light with social)')
+        subquery = (
+            select(
+                func.row_number().over(
+                    partition_by=Profile.proxy_id,
+                    order_by=func.random()
+                ).label('rn'),
+                Profile
+            )
+            .alias('subquery')
+        )
+        query = (
+            select(Profile.id, model.login)
+            .join(model).join(Proxy)
+            .join(subquery, subquery.c.id == Profile.id)
+            .where(subquery.c.rn == 1)
+            .limit(limit)
+        )
         result = await self._exec_stmt(query)
         return [tuple(el) for el in result.all()]
 
