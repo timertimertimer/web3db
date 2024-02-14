@@ -216,23 +216,6 @@ class DBHelper:
         result = await self._exec_stmt(query)
         return result.scalars().first()
 
-    async def get_first_profiles_by_proxy(self, limit: int = None) -> Sequence[Profile]:
-        logger.info(f'Getting first profiles by proxy')
-        subquery = select(
-            func.row_number().over(partition_by=Profile.proxy_id, order_by=Profile.id).label('rn'),
-            Profile
-        ).alias('subquery')
-        query = (
-            select(Profile)
-            .join(subquery, subquery.c.id == Profile.id)
-            .where(subquery.c.rn == 1)
-            .order_by(Profile.proxy_id, Profile.id)
-            .options(joinedload('*'))
-            .limit(limit)
-        )
-        result = await self._exec_stmt(query)
-        return result.scalars().all()
-
     async def get_random_profile(self) -> Profile:
         logger.info(f'Getting random profile')
         query = select(Profile).order_by(func.random()).options(joinedload('*'))
@@ -261,7 +244,7 @@ class DBHelper:
         result = await self._exec_stmt(query)
         return result.scalars().all()
 
-    async def get_random_profiles_by_proxy_light(self, model, limit: int = None) -> list:
+    async def get_random_profiles_ids_by_proxy(self, limit: int = None) -> Sequence[int]:
         logger.info(f'Getting random profiles by proxy (light with social)')
         subquery = (
             select(
@@ -274,18 +257,24 @@ class DBHelper:
             .alias('subquery')
         )
         query = (
-            select(Profile.id, model.login)
-            .join(model).join(Proxy)
+            select(Profile.id)
+            .join(Proxy)
             .join(subquery, subquery.c.id == Profile.id)
             .where(subquery.c.rn == 1)
             .limit(limit)
         )
         result = await self._exec_stmt(query)
-        return [tuple(el) for el in result.all()]
+        return result.scalars().all()
 
-    async def get_ready_profiles(self, model, limit: int = None) -> Sequence[Profile]:
+    async def get_ready_profiles_by_model(self, model, limit: int = None) -> Sequence[Profile]:
         logger.info(f'Getting ready {model.__name__.lower()} profiles')
         query = select(Profile).join(model).where(model.ready).options(joinedload('*')).limit(limit)
+        result = await self._exec_stmt(query)
+        return result.scalars().all()
+
+    async def get_ready_profiles_ids_by_model(self, model, limit: int = None) -> Sequence[int]:
+        logger.info(f'Getting ready {model.__name__.lower()} profiles (light with social)')
+        query = select(Profile.id).join(model).where(model.ready).limit(limit)
         result = await self._exec_stmt(query)
         return result.scalars().all()
 
