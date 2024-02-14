@@ -4,7 +4,7 @@ import base58
 from eth_account import Account as EVMAccount
 from aptos_sdk.account import Account as AptosAccount
 from solana.rpc.api import Keypair
-from sqlalchemy import Result, func, Sequence, delete, and_, not_, desc
+from sqlalchemy import Result, func, Sequence, delete, and_, not_, desc, Select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy.future import select
@@ -45,7 +45,7 @@ class DBHelper:
 
     async def _exec_stmt(
             self,
-            stmt
+            stmt: Select | list[Select]
     ) -> Result:
         logger.info(stmt)
         async with self.session_factory() as session:
@@ -216,7 +216,7 @@ class DBHelper:
         result = await self._exec_stmt(query)
         return result.scalars().first()
 
-    async def get_first_profiles_by_proxy(self, limit: int = None) -> list[Profile]:
+    async def get_first_profiles_by_proxy(self, limit: int = None) -> Sequence[Profile]:
         logger.info(f'Getting first profiles by proxy')
         subquery = select(
             func.row_number().over(partition_by=Profile.proxy_id, order_by=Profile.id).label('rn'),
@@ -282,6 +282,12 @@ class DBHelper:
         )
         result = await self._exec_stmt(query)
         return [tuple(el) for el in result.all()]
+
+    async def get_ready_profiles(self, model, limit: int = None) -> Sequence[Profile]:
+        logger.info(f'Getting ready {model.__name__.lower()} profiles')
+        query = select(Profile).join(model).where(model.ready).options(joinedload('*')).limit(limit)
+        result = await self._exec_stmt(query)
+        return result.scalars().all()
 
     async def get_potential_profiles(self, limit: int = None, n_for_proxy: int = 3) -> list[Profile]:
         free_proxies = await self.get_free_proxies(limit=limit, n_for_proxy=n_for_proxy)
