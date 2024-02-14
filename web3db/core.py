@@ -1,3 +1,4 @@
+import os
 import random
 
 import base58
@@ -122,9 +123,11 @@ class DBHelper:
             email: str,
             discord_login: str,
             twitter_login: str,
-            evm_private_encoded: str,
-            aptos_private_encoded: str,
-            solana_private_encoded: str
+            evm_private: str,
+            aptos_private: str,
+            solana_private: str,
+            recipient,
+            passphrase
     ) -> None:
         logger.info(f'Adding Profile {email}:{proxy_string}')
         mail = await self.get_row_by_login(email, Email)
@@ -143,12 +146,21 @@ class DBHelper:
         if not proxy:
             logger.error(f'Need proxy {proxy_string}')
             return
+        evm_account = EVMAccount.from_key(evm_private)
+        aptos_account = AptosAccount.load_key(aptos_private)
+        solana_keypair = Keypair.from_base58_string(solana_private)
+        evm_private_encoded = encrypt(evm_private, recipient, passphrase)
+        aptos_private_encoded = encrypt(aptos_private, recipient, passphrase)
+        solana_private_encoded = encrypt(solana_private, recipient, passphrase)
         await self.add_record(
             Profile(
                 proxy=proxy,
                 email=email,
                 discord=discord,
                 twitter=twitter,
+                evm_address=evm_account.address,
+                aptos_address=str(aptos_account.address()),
+                solana_address=str(solana_keypair.pubkey()),
                 evm_private=evm_private_encoded,
                 aptos_private=aptos_private_encoded,
                 solana_private=solana_private_encoded
@@ -297,9 +309,11 @@ class DBHelper:
     ) -> list[Profile]:
         potential_profiles = await self.get_potential_profiles(limit, n_for_proxy)
         for i, profile in enumerate(potential_profiles):
-            profile.evm_private = encrypt(EVMAccount.create().key.hex(), recipient, passphrase)
-            profile.aptos_private = encrypt(AptosAccount.generate().private_key.hex(), recipient, passphrase)
+            evm_account = EVMAccount.create()
+            aptos_account = AptosAccount.generate()
             solana_keypair = Keypair()
+            profile.evm_private = encrypt(evm_account.key.hex(), recipient, passphrase)
+            profile.aptos_private = encrypt(aptos_account.private_key.hex(), recipient, passphrase)
             profile.solana_private = encrypt(
                 base58.b58encode(solana_keypair.secret() + bytes(solana_keypair.pubkey())).decode(),
                 recipient, passphrase
