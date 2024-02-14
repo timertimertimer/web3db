@@ -196,12 +196,12 @@ class DBHelper:
         result = await self._exec_stmt(query)
         return result.scalars().all()
 
-    async def get_profiles_by_id_light(self, model, ids: list[int] = None) -> list:
+    async def get_profiles_light_by_model(self, model, ids: list[int] = None, limit: int = None) -> list:
         logger.info(f'Getting profiles by id (light with social)')
-        query = select(Profile.id, model.login).join(model).order_by(Profile.id)
+        query = select(Profile.id, model.login, model.ready).join(model).order_by(Profile.id)
         if ids:
             query = query.filter(Profile.id.in_(ids))
-        result = await self._exec_stmt(query)
+        result = await self._exec_stmt(query.limit(limit))
         return [tuple(el) for el in result.all()]
 
     async def get_profile_by_twitter_login(self, login: str) -> Profile:
