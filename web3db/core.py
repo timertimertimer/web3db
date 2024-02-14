@@ -199,7 +199,7 @@ class DBHelper:
 
     async def get_profiles_by_id_light(self, model, ids: list[int] = None) -> list:
         logger.info(f'Getting profiles by id (light with social)')
-        query = select(Profile.id, model.login, Proxy.proxy_string).join(model).join(Proxy).order_by(Profile.id)
+        query = select(Profile.id, model.login).join(model).order_by(Profile.id)
         if ids:
             query = query.filter(Profile.id.in_(ids))
         result = await self._exec_stmt(query)
@@ -234,12 +234,6 @@ class DBHelper:
         result = await self._exec_stmt(query)
         return result.scalars().all()
 
-    async def get_first_profiles_by_proxy_light(self, model, limit: int = None):
-        logger.info(f'Getting first profiles by proxy (light with social)')
-        query = select(Profile.id, model.login, Proxy.proxy_string).join(model).join(Proxy).limit(limit)
-        result = await self._exec_stmt(query)
-        return [tuple(el) for el in result.all()]
-
     async def get_random_profile(self) -> Profile:
         logger.info(f'Getting random profile')
         query = select(Profile).order_by(func.random()).options(joinedload('*'))
@@ -272,7 +266,7 @@ class DBHelper:
 
     async def get_random_profiles_by_proxy_distinct_light(self, model, limit: int = None) -> list:
         logger.info(f'Getting random profiles by proxy distinct (light with social)')
-        query = select(Profile.id, model.login, Proxy.proxy_string).join(model).join(Proxy).distinct(
+        query = select(Profile.id, model.login).join(model).distinct(
             Proxy.proxy_string).limit(limit)
         result = await self._exec_stmt(query)
         return [tuple(el) for el in result.all()]
