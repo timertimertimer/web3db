@@ -4,7 +4,7 @@ import base58
 from eth_account import Account as EVMAccount
 from aptos_sdk.account import Account as AptosAccount
 from solana.rpc.api import Keypair
-from sqlalchemy import Result, func, Sequence, delete, and_, not_, desc, Select
+from sqlalchemy import Result, func, Sequence, delete, and_, not_, desc, Select, Update, Delete
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy.future import select
@@ -45,7 +45,7 @@ class DBHelper:
 
     async def _exec_stmt(
             self,
-            stmt: Select | list[Select]
+            stmt: Select | list[Select] | Delete | Update
     ) -> Result:
         logger.info(stmt)
         async with self.session_factory() as session:
@@ -173,9 +173,12 @@ class DBHelper:
             logger.info(f'Editing row with {edited_model.id} id in {edited_model.__tablename__} table')
         await self.add_record(edited_model)
 
-    async def delete(self, model) -> None:
-        logger.info(f'Deleting row with {model.id} id from {model.__tablename__} table')
-        query = delete(type(model)).where(model.id == type(model).id)
+    async def delete(self, model: Email | Twitter | Discord | Proxy | Github | Profile | list) -> None:
+        if not isinstance(model, list):
+            models = [model]
+        ids = [model.id for model in models]
+        logger.info(f'Deleting rows with {", ".join(ids)} ids from {models[0].__tablename__} table')
+        query = delete(type(models[0])).where(models[0].id.in_(ids))
         await self._exec_stmt(query)
 
     async def get_all_from_table(self, model, limit: int = None):
@@ -196,7 +199,12 @@ class DBHelper:
         result = await self._exec_stmt(query)
         return result.scalars().all()
 
-    async def get_profiles_light_by_model(self, model, ids: list[int] = None, limit: int = None) -> list:
+    async def get_profiles_light_by_model(
+            self,
+            model,
+            ids: list[int] = None,
+            limit: int = None
+    ) -> list[tuple[int, str, bool]]:
         logger.info(f'Getting profiles by id (light with social)')
         query = select(Profile.id, model.login, model.ready).join(model).order_by(Profile.id)
         if ids:
@@ -359,5 +367,36 @@ class DBHelper:
         result = await self._exec_stmt(query)
         return result.all()
 
-    async def change_twitter(self, profile_id: int, delete_twitter: bool = False, delete_email: bool = False) -> None:
-        logger.info(f'changing twitter for {profile_id} profile')
+    async def change_twitter(self, profile_ids: int | list[int], delete_twitter: bool = False,
+                             delete_email: bool = False) -> None:
+        logger.info(f'changing twitter for {profile_ids} profile')
+        if isinstance(profile_ids, int):
+            profile_ids = [profile_ids]
+        async with self.session_factory() as session:
+            query = select(Profile).where(Profile.id.in_(profile_ids)).options(joinedload('*'))
+            profiles: list[Profile] = (await session.execute(query)).scalars().all()
+            logger.info(f"Profiles {profiles} will be changed")
+            twitters_to_delete: list[Twitter] = [profile.twitter for profile in profiles]
+            free_twitters = (await session.execute(
+                (
+                    select(Twitter).where(~Twitter.id.in_(select(Profile.twitter_id))).order_by(Twitter.id)
+                    .options(joinedload(Twitter.email))
+                )
+            )).scalars().all()
+            for profile, twitter in zip(profiles, free_twitters):
+                logger.info(f'{profile.id} | Old twitter {profile.twitter}')
+                profile.twitter = twitter
+                logger.info(f'{profile.id} | New twitter {profile.twitter}')
+            await session.commit()
+            if delete_twitter:
+                logger.info(f"Twitters {twitters_to_delete} will be deleted")
+                emails_to_delete = [twitter.email for twitter in twitters_to_delete]
+                await session.execute(
+                    delete(Twitter).where(Twitter.id.in_([twitter.id for twitter in twitters_to_delete]))
+                )
+                if delete_email:
+                    logger.info(f'Emails {emails_to_delete} will be deleted')
+                    await session.execute(
+                        delete(Email).where(Email.id.in_([email.id for email in emails_to_delete if email]))
+                    )
+            await session.commit()
