@@ -1,4 +1,5 @@
 import random
+from typing import Union
 
 import base58
 from eth_account import Account as EVMAccount
@@ -14,6 +15,8 @@ from web3db.models import *
 from web3db.utils import logger
 from web3db.utils.encrypt_private import encrypt
 
+ModelType = Union[type(Email), type(Discord), type(Twitter), type(Github), type(Proxy)]
+
 
 class DBHelper:
 
@@ -28,8 +31,8 @@ class DBHelper:
 
     async def add_record(
             self,
-            record: Email | Discord | Twitter | Profile | Proxy | Github | list
-    ) -> Email | Discord | Twitter | Profile | Proxy | Github | None:
+            record: Email | Discord | Twitter | Github | Proxy | Profile | list
+    ) -> Email | Discord | Twitter | Github | Proxy | Profile | None:
         logger.info(record)
         async with self.session_factory() as session:
             try:
@@ -45,7 +48,7 @@ class DBHelper:
 
     async def _exec_stmt(
             self,
-            stmt: Select | list[Select] | Delete | Update
+            stmt: Select | Delete | Update | list
     ) -> Result:
         logger.info(stmt)
         async with self.session_factory() as session:
@@ -56,7 +59,7 @@ class DBHelper:
             await session.commit()
             return result
 
-    async def get_row_by_login(self, login: str, model) -> Email | Twitter | Discord | Proxy | None:
+    async def get_row_by_login(self, login: str, model) -> Email | Discord | Twitter | Github | Proxy | None:
         if model == Proxy:
             query = select(model).where(model.proxy_string == login).options(joinedload('*'))
         else:
@@ -125,8 +128,8 @@ class DBHelper:
             evm_private: str,
             aptos_private: str,
             solana_private: str,
-            recipient,
-            passphrase
+            recipient: str,
+            passphrase: str
     ) -> None:
         logger.info(f'Adding Profile {email}:{proxy_string}')
         mail = await self.get_row_by_login(email, Email)
@@ -166,14 +169,14 @@ class DBHelper:
             )
         )
 
-    async def edit(self, edited_model: Twitter | Discord | Email | Profile | Proxy | list) -> None:
+    async def edit(self, edited_model: ModelType | list) -> None:
         if isinstance(edited_model, list):
             logger.info(f'Editing rows in {edited_model[0].__tablename__} table')
         else:
             logger.info(f'Editing row with {edited_model.id} id in {edited_model.__tablename__} table')
         await self.add_record(edited_model)
 
-    async def delete(self, model: Email | Twitter | Discord | Proxy | Github | Profile | list) -> None:
+    async def delete(self, model: ModelType | list) -> None:
         if not isinstance(model, list):
             models = [model]
         ids = [model.id for model in models]
@@ -181,19 +184,27 @@ class DBHelper:
         query = delete(type(models[0])).where(models[0].id.in_(ids))
         await self._exec_stmt(query)
 
-    async def get_all_from_table(self, model, limit: int = None):
+    async def get_all_from_table(self, model: ModelType, limit: int = None):
         logger.info(f'Getting all rows from {model.__tablename__} table')
-        query = select(model).options(joinedload('*')).limit(limit)
+        query = select(model).options(joinedload('*')).limit(limit).order_by(model.id)
         result = await self._exec_stmt(query)
         return result.scalars().all()
 
-    async def get_row_by_id(self, id_: int, model) -> Twitter | Discord | Email | Profile | Proxy:
+    async def get_row_by_id(
+            self,
+            id_: int,
+            model: ModelType
+    ) -> Twitter | Discord | Email | Profile | Proxy:
         logger.info(f'Getting row with {id_} id from {model.__tablename__} table')
         query = select(model).where(model.id == id_).options(joinedload('*'))
         result = await self._exec_stmt(query)
         return result.scalars().first()
 
-    async def get_rows_by_id(self, ids: list[int], model) -> Sequence[Email | Twitter | Discord | Proxy | Profile]:
+    async def get_rows_by_id(
+            self,
+            ids: list[int],
+            model: ModelType
+    ) -> Sequence[Email | Twitter | Discord | Proxy | Profile]:
         logger.info(f'Getting rows with {", ".join(map(str, ids))} ids from {model.__tablename__} table')
         query = select(model).filter(model.id.in_(ids)).order_by(model.id).options(joinedload('*'))
         result = await self._exec_stmt(query)
@@ -201,26 +212,27 @@ class DBHelper:
 
     async def get_profiles_light_by_model(
             self,
-            model,
+            model: ModelType,
             ids: list[int] = None,
             limit: int = None
     ) -> list[tuple[int, str, bool]]:
-        logger.info(f'Getting profiles by id (light with social)')
-        query = select(Profile.id, model.login, model.ready).join(model).order_by(Profile.id)
+        logger.info(f'Getting profiles by id (light with model)')
+        query = (
+            select(Profile.id, model.proxy_string if model == Proxy else model.login, model.ready)
+            .join(model).order_by(Profile.id)
+        )
         if ids:
             query = query.filter(Profile.id.in_(ids))
         result = await self._exec_stmt(query.limit(limit))
         return [tuple(el) for el in result.all()]
 
-    async def get_profile_by_twitter_login(self, login: str) -> Profile:
-        logger.info(f'Getting twitter {login}')
-        query = select(Profile).where(Profile.twitter.has(Twitter.login == login)).options(joinedload('*'))
-        result = await self._exec_stmt(query)
-        return result.scalars().first()
-
-    async def get_profile_by_discord_login(self, login: str) -> Profile:
-        logger.info(f'Getting discord {login}')
-        query = select(Profile).where(Profile.discord.has(Discord.login == login)).options(joinedload('*'))
+    async def get_profile_by_models_login(
+            self,
+            model: ModelType,
+            login: str
+    ) -> Profile:
+        logger.info(f'Getting {model.__name__} by login - {login}')
+        query = select(Profile).where(model.login == login).options(joinedload('*'))
         result = await self._exec_stmt(query)
         return result.scalars().first()
 
@@ -274,13 +286,21 @@ class DBHelper:
         result = await self._exec_stmt(query)
         return result.scalars().all()
 
-    async def get_ready_profiles_by_model(self, model, limit: int = None) -> Sequence[Profile]:
+    async def get_ready_profiles_by_model(
+            self,
+            model: type(Discord) | type(Twitter) | type(Github),
+            limit: int = None
+    ) -> Sequence[Profile]:
         logger.info(f'Getting ready {model.__name__.lower()} profiles')
         query = select(Profile).join(model).where(model.ready).options(joinedload('*')).limit(limit)
         result = await self._exec_stmt(query)
         return result.scalars().all()
 
-    async def get_ready_profiles_ids_by_model(self, model, limit: int = None) -> Sequence[int]:
+    async def get_ready_profiles_ids_by_model(
+            self,
+            model: type(Discord) | type(Twitter) | type(Github),
+            limit: int = None
+    ) -> Sequence[int]:
         logger.info(f'Getting ready {model.__name__.lower()} profiles (light with social)')
         query = select(Profile.id).join(model).where(model.ready).limit(limit)
         result = await self._exec_stmt(query)
@@ -367,34 +387,38 @@ class DBHelper:
         result = await self._exec_stmt(query)
         return result.all()
 
-    async def change_twitter(self, profile_ids: int | list[int], delete_twitter: bool = False,
-                             delete_email: bool = False) -> None:
-        logger.info(f'changing twitter for {profile_ids} profile')
+    async def change_model(
+            self,
+            profile_ids: int | list[int],
+            model: type(Discord) | type(Twitter) | type(Github) | type(Proxy),
+            delete_model: bool = False,
+            delete_models_email: bool = False
+    ) -> None:
         if isinstance(profile_ids, int):
             profile_ids = [profile_ids]
+        logger.info(f'Changing {model.__name__.lower()} for {profile_ids} profiles')
         async with self.session_factory() as session:
             query = select(Profile).where(Profile.id.in_(profile_ids)).options(joinedload('*'))
             profiles: list[Profile] = (await session.execute(query)).scalars().all()
-            logger.info(f"Profiles {profiles} will be changed")
-            twitters_to_delete: list[Twitter] = [profile.twitter for profile in profiles]
-            free_twitters = (await session.execute(
+            models_to_delete: list[model] = [getattr(profile, model.__name__.lower()) for profile in profiles]
+            free_models_rows = (await session.execute(
                 (
-                    select(Twitter).where(~Twitter.id.in_(select(Profile.twitter_id))).order_by(Twitter.id)
-                    .options(joinedload(Twitter.email))
+                    select(model).where(~model.id.in_(select(Profile.twitter_id))).order_by(model.id)
+                    .options(joinedload(model.email)).limit(len(profile_ids))
                 )
             )).scalars().all()
-            for profile, twitter in zip(profiles, free_twitters):
-                logger.info(f'{profile.id} | Old twitter {profile.twitter}')
-                profile.twitter = twitter
-                logger.info(f'{profile.id} | New twitter {profile.twitter}')
+            for profile, model in zip(profiles, free_models_rows):
+                logger.info(f'{profile.id} | Old {model.__name__.lower()} {getattr(profile, model.__name__.lower())}')
+                setattr(profile, model.__name__.lower(), model)
+                logger.info(f'{profile.id} | New {model.__name__.lower()} {getattr(profile, model.__name__.lower())}')
             await session.commit()
-            if delete_twitter:
-                logger.info(f"Twitters {twitters_to_delete} will be deleted")
-                emails_to_delete = [twitter.email for twitter in twitters_to_delete]
+            if delete_model:
+                logger.info(f"{model.__tablename__.capitalize()} {models_to_delete} will be deleted")
+                emails_to_delete = [getattr(model, 'email') for model in models_to_delete]
                 await session.execute(
-                    delete(Twitter).where(Twitter.id.in_([twitter.id for twitter in twitters_to_delete]))
+                    delete(model).where(model.id.in_([getattr(model, 'id') for model in models_to_delete]))
                 )
-                if delete_email:
+                if delete_models_email:
                     logger.info(f'Emails {emails_to_delete} will be deleted')
                     await session.execute(
                         delete(Email).where(Email.id.in_([email.id for email in emails_to_delete if email]))
