@@ -20,6 +20,8 @@ class Twitter(EmailRelationMixin, Base):
     password: Mapped[str] = mapped_column(String)
     auth_token: Mapped[str] = mapped_column(String, unique=True)
     ready: Mapped[bool] = mapped_column(Boolean, default=False)
+    totp_secret: Mapped[str] = mapped_column(String, nullable=True)
+    backup_code: Mapped[str] = mapped_column(String, nullable=True)
 
     profile: Mapped['Profile'] = relationship(back_populates='twitter')
 
