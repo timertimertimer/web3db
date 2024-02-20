@@ -292,7 +292,7 @@ class DBHelper:
             limit: int = None
     ) -> Sequence[Profile]:
         logger.info(f'Getting ready {model.__name__.lower()} profiles')
-        query = select(Profile).join(model).where(model.ready).options(joinedload('*')).limit(limit)
+        query = select(Profile).join(model).where(model.ready).options(joinedload('*')).limit(limit).order_by(Profile.id)
         result = await self._exec_stmt(query)
         return result.scalars().all()
 

@@ -27,12 +27,13 @@ class Profile(
     _github_back_populates = 'profile'
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    evm_address: Mapped[str] = mapped_column(String)
-    aptos_address: Mapped[str] = mapped_column(String)
-    solana_address: Mapped[str] = mapped_column(String)
+    evm_address: Mapped[str] = mapped_column(String, unique=True)
+    aptos_address: Mapped[str] = mapped_column(String, unique=True)
+    solana_address: Mapped[str] = mapped_column(String, unique=True)
     evm_private: Mapped[str] = mapped_column(String)
     aptos_private: Mapped[str] = mapped_column(String)
     solana_private: Mapped[str] = mapped_column(String)
+    okx_evm_address: Mapped[str] = mapped_column(String, nullable=True, unique=True)
 
     def __repr__(self):
         return (f'{self.id}:{self.email.login}:{self.twitter.login}:{self.discord.login}:'
