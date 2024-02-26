@@ -26,7 +26,7 @@ class EmailRelationMixin:
 
 
 class DiscordRelationMixin:
-    _discord_id_nullable: bool = False
+    _discord_id_nullable: bool = True
     _discord_back_populates: str = None
     _discord_id_unique: bool = True
 
@@ -41,7 +41,7 @@ class DiscordRelationMixin:
 
 
 class TwitterRelationMixin:
-    _twitter_id_nullable: bool = False
+    _twitter_id_nullable: bool = True
     _twitter_back_populates: str = None
     _twitter_id_unique: bool = True
 
@@ -62,8 +62,7 @@ class ProxyRelationMixin:
 
     @declared_attr
     def proxy_id(cls):
-        return mapped_column(ForeignKey('proxies.id'), nullable=cls._proxy_id_nullable,
-                             unique=cls._proxy_id_unique)
+        return mapped_column(ForeignKey('proxies.id'), nullable=cls._proxy_id_nullable, unique=cls._proxy_id_unique)
 
     @declared_attr
     def proxy(cls) -> Mapped['Proxy']:
@@ -77,8 +76,7 @@ class GithubRelationMixin:
 
     @declared_attr
     def github_id(cls):
-        return mapped_column(ForeignKey('githubs.id'), nullable=cls._github_id_nullable,
-                             unique=cls._github_id_unique)
+        return mapped_column(ForeignKey('githubs.id'), nullable=cls._github_id_nullable, unique=cls._github_id_unique)
 
     @declared_attr
     def github(cls) -> Mapped['Github']:
