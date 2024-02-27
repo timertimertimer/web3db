@@ -5,7 +5,7 @@ import base58
 from eth_account import Account as EVMAccount
 from aptos_sdk.account import Account as AptosAccount
 from solana.rpc.api import Keypair
-from sqlalchemy import Result, func, Sequence, delete, and_, not_, desc, Select, Update, Delete
+from sqlalchemy import Result, func, Sequence, delete, and_, not_, desc, Select, Update, Delete, case
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy.future import select
@@ -16,6 +16,8 @@ from web3db.utils import logger
 from web3db.utils.encrypt_private import encrypt
 
 ModelType = Union[type(Email), type(Discord), type(Twitter), type(Github), type(Proxy), type(Profile)]
+INDIVIDUAL_PROXY_LIMIT = 3
+SHARED_PROXY_LIMIT = 1
 
 
 class DBHelper:
@@ -285,29 +287,22 @@ class DBHelper:
         result = await self._exec_stmt(query)
         return result.scalars().all()
 
-    async def get_potential_profiles(self, limit: int = None, n_for_proxy: int = 3) -> list[Profile]:
-        free_proxies = await self.get_free_proxies(limit=limit, n_for_proxy=n_for_proxy)
+    async def get_potential_profiles(self, limit: int = None) -> list[Profile]:
+        free_proxies: list[Proxy] = await self.get_free_proxies(limit=limit)
         free_proxies_count = sum([el[-1] for el in free_proxies])
-        free_emails = await self.get_free_emails(limit=limit or free_proxies_count)
-        free_discords = await self.get_free_discords(limit=limit or min(len(free_emails), free_proxies_count))
-        free_twitters = await self.get_free_twitters(
-            limit=limit or min(len(free_emails), len(free_discords), free_proxies_count)
-        )
+        free_emails: list[Email] = await self.get_free_emails(limit=limit or free_proxies_count)
+        free_discords: list[Discord] = await self.get_free_discords(limit=limit or free_proxies_count)
+        free_twitters: list[Twitter] = await self.get_free_twitters(limit=limit or free_proxies_count)
         free_proxies_all = []
         for free_proxy, n in free_proxies:
             free_proxies_all += [free_proxy] * n
         random.shuffle(free_proxies_all)
         potential_profiles = []
-        for (
-                free_email,
-                free_discord,
-                free_twitter,
-                free_proxy
-        ) in zip(free_emails, free_discords, free_twitters, free_proxies_all):
+        for i, free_proxy in enumerate(free_proxies_all):
             potential_profiles.append(Profile(
-                email=free_email,
-                discord=free_discord,
-                twitter=free_twitter,
+                email=free_emails[i] if i < len(free_emails) else None,
+                discord=free_discords[i] if i < len(free_discords) else None,
+                twitter=free_twitters[i] if i < len(free_twitters) else None,
                 proxy=free_proxy
             ))
         return potential_profiles
@@ -316,20 +311,22 @@ class DBHelper:
             self,
             recipient: str,
             passphrase: str,
-            limit: int = None,
-            n_for_proxy: int = 3
+            limit: int = None
     ) -> list[Profile]:
-        potential_profiles = await self.get_potential_profiles(limit, n_for_proxy)
+        potential_profiles = await self.get_potential_profiles(limit)
         for i, profile in enumerate(potential_profiles):
             evm_account = EVMAccount.create()
             aptos_account = AptosAccount.generate()
             solana_keypair = Keypair()
             profile.evm_private = encrypt(evm_account.key.hex(), recipient, passphrase)
+            profile.evm_address = evm_account.address
             profile.aptos_private = encrypt(aptos_account.private_key.hex(), recipient, passphrase)
+            profile.aptos_address = str(aptos_account.address())
             profile.solana_private = encrypt(
                 base58.b58encode(solana_keypair.secret() + bytes(solana_keypair.pubkey())).decode(),
                 recipient, passphrase
             )
+            profile.solana_address = str(solana_keypair.pubkey())
         result = await self.add_record(potential_profiles)
         return result
 
@@ -340,7 +337,12 @@ class DBHelper:
             .where(Twitter.email_id.isnot(None))
             .union(select(Profile.email_id).where(Profile.email_id.isnot(None)))
         )
-        query = select(Email).where(and_(~Email.id.in_(subquery), not_(Email.login.ilike('%.ru')))).limit(limit)
+        query = (
+            select(Email)
+            .where(and_(~Email.id.in_(subquery), not_(Email.login.ilike('%.ru'))))
+            .order_by(Email.id)
+            .limit(limit)
+        )
         result = await self._exec_stmt(query)
         return result.scalars().all()
 
@@ -349,6 +351,7 @@ class DBHelper:
         query = (
             select(Discord)
             .where(~Discord.id.in_(select(Profile.discord_id).where(Profile.discord_id.isnot(None))))
+            .order_by(Discord.id)
             .options(joinedload(Discord.email))
             .limit(limit)
         )
@@ -367,11 +370,16 @@ class DBHelper:
         result = await self._exec_stmt(query)
         return result.scalars().all()
 
-    async def get_free_proxies(self, limit: int = None, n_for_proxy: int = 3) -> Sequence[Proxy]:
+    async def get_free_proxies(self, limit: int = None) -> Sequence[Proxy]:
         logger.info(f'Getting free proxies')
         query = (
-            select(Proxy, (n_for_proxy - func.count(Profile.proxy_id)).label('count_1')).outerjoin(Profile)
-            .group_by(Proxy).having(func.count(Profile.proxy_id) < n_for_proxy).order_by(desc('count_1')).limit(limit)
+            select(Proxy, case(
+                (Proxy.proxy_type == 'individual', INDIVIDUAL_PROXY_LIMIT - func.count(Profile.proxy_id)),
+                (Proxy.proxy_type == 'shared', SHARED_PROXY_LIMIT - func.count(Profile.proxy_id))
+            ).label('count_1')).outerjoin(Profile).group_by(Proxy).having(
+                (Proxy.proxy_type == 'individual' and func.count(Profile.proxy_id) < 3) or
+                (Proxy.proxy_type == 'shared' and func.count(Profile.proxy_id) < 2)
+            ).order_by(desc('count_1')).limit(limit)
         )
         result = await self._exec_stmt(query)
         return result.all()

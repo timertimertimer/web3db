@@ -25,6 +25,7 @@ class Profile(
     _discord_back_populates = 'profile'
     _proxy_back_populates = 'profile'
     _github_back_populates = 'profile'
+    _email_id_nullable = True
 
     id: Mapped[int] = mapped_column(primary_key=True)
     evm_address: Mapped[str] = mapped_column(String, unique=True)
@@ -34,9 +35,12 @@ class Profile(
     aptos_private: Mapped[str] = mapped_column(String)
     solana_private: Mapped[str] = mapped_column(String)
     okx_evm_address: Mapped[str] = mapped_column(String, nullable=True, unique=True)
+    okx_aptos_address: Mapped[str] = mapped_column(String, nullable=True, unique=True)
+    okx_solana_address: Mapped[str] = mapped_column(String, nullable=True, unique=True)
 
     def __repr__(self):
-        return (f'{self.id}:{self.email.login}:{self.twitter.login}:{self.discord.login}:'
+        return (f'{self.id}:{self.email.login}:{self.twitter.login if self.twitter else None}:'
+                f'{self.discord.login if self.discord else None}:'
                 f'{self.proxy.proxy_string if self.proxy else None}')
 
     def __str__(self):
