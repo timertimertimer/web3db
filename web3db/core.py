@@ -291,8 +291,8 @@ class DBHelper:
         free_proxies: list[Proxy] = await self.get_free_proxies(limit=limit)
         free_proxies_count = sum([el[-1] for el in free_proxies])
         free_emails: list[Email] = await self.get_free_emails(limit=limit or free_proxies_count)
-        free_discords: list[Discord] = await self.get_free_discords(limit=limit or free_proxies_count)
-        free_twitters: list[Twitter] = await self.get_free_twitters(limit=limit or free_proxies_count)
+        free_discords: list[Discord] = await self.get_free_model(Discord, limit=limit or free_proxies_count)
+        free_twitters: list[Twitter] = await self.get_free_model(Twitter, limit=limit or free_proxies_count)
         free_proxies_all = []
         for free_proxy, n in free_proxies:
             free_proxies_all += [free_proxy] * n
@@ -346,25 +346,19 @@ class DBHelper:
         result = await self._exec_stmt(query)
         return result.scalars().all()
 
-    async def get_free_discords(self, limit: int = None) -> Sequence[Discord]:
-        logger.info(f'Getting free discords')
+    async def get_free_model(
+            self,
+            model: type(Twitter) | type(Discord) | type(Github),
+            limit: int = None
+    ) -> Sequence[Twitter | Discord | Github]:
+        logger.info(f'Getting free {model.__tablename__}')
         query = (
-            select(Discord)
-            .where(~Discord.id.in_(select(Profile.discord_id).where(Profile.discord_id.isnot(None))))
-            .order_by(Discord.id)
-            .options(joinedload(Discord.email))
-            .limit(limit)
-        )
-        result = await self._exec_stmt(query)
-        return result.scalars().all()
-
-    async def get_free_twitters(self, limit: int = None) -> Sequence[Twitter]:
-        logger.info(f'Getting free twitters')
-        query = (
-            select(Twitter)
-            .where(~Twitter.id.in_(select(Profile.twitter_id)))
-            .order_by(Twitter.id)
-            .options(joinedload(Twitter.email))
+            select(model)
+            .where(~model.id.in_(
+                select(getattr(Profile, model.__name__.lower() + '_id'))
+                .where(getattr(Profile, model.__name__.lower() + '_id').isnot(None))))
+            .order_by(model.id)
+            .options(joinedload(model.email))
             .limit(limit)
         )
         result = await self._exec_stmt(query)
@@ -396,15 +390,12 @@ class DBHelper:
         logger.info(f'Changing {model.__name__.lower()} for {profile_ids} profiles')
         profiles: list[Profile] = await self.get_rows_by_id(profile_ids, Profile)
         models_to_delete: list[model] = [getattr(profile, model.__name__.lower()) for profile in profiles]
-        free_models_rows = (
-            await self._exec_stmt(
-                select(model)
-                .where(~model.id.in_(select(Profile.twitter_id)))
-                .order_by(model.id)
-                .options(joinedload(model.email))
-                .limit(len(profile_ids))
-            )
-        ).scalars().all()
+        if model in (Twitter, Discord, Github):
+            free_models_rows = await self.get_free_model(model, limit=len(profile_ids))
+        elif model == Proxy:
+            free_models_rows = await self.get_free_proxies(limit=len(profile_ids))
+        elif model == Email:
+            free_models_rows = await self.get_free_emails(limit=len(profile_ids))
         for profile, model in zip(profiles, free_models_rows):
             logger.info(f'{profile.id} | Old {model.__name__.lower()} {getattr(profile, model.__name__.lower())}')
             setattr(profile, model.__name__.lower(), model)
@@ -417,33 +408,3 @@ class DBHelper:
             if delete_models_email:
                 logger.info(f'Emails {emails_to_delete} will be deleted')
                 await self.delete(emails_to_delete)
-
-    async def change_profile_email(
-            self,
-            profile_ids: int | list[int],
-            delete_email: bool = False
-    ):
-        if isinstance(profile_ids, int):
-            profile_ids = [profile_ids]
-        logger.info(f'Changing email for {profile_ids} profiles')
-        profiles: list[Profile] = await self.get_rows_by_id(profile_ids, Profile)
-        emails_to_delete: list[Email] = [profile.email for profile in profiles]
-        free_emails_rows = (
-            await self._exec_stmt(
-                select(Email)
-                .where(and_(~Email.id.in_(
-                    select(Twitter.email_id)
-                    .where(Twitter.email_id.isnot(None))
-                    .union(select(Profile.email_id).where(Profile.email_id.isnot(None)))
-                ), not_(Email.login.ilike('%.ru'))))
-                .limit(len(profile_ids))
-            )
-        ).scalars().all()
-        for profile, email in zip(profiles, free_emails_rows):
-            logger.info(f'{profile.id} | Old email {profile.email}')
-            profile.email = email
-            logger.info(f'{profile.id} | New email {profile.email}')
-        await self.edit(profiles)
-        if delete_email:
-            logger.info(f"Emails {emails_to_delete} will be deleted")
-            await self.delete(emails_to_delete)
