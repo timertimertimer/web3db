@@ -294,6 +294,7 @@ class DBHelper:
             .where(model.totp_secret != None)
             .options(joinedload(getattr(Profile, model.__name__.lower())))
             .limit(limit)
+            .order_by(Profile.id)
         )
         result = await self._exec_stmt(query)
         return result.scalars().all()
