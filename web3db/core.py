@@ -32,7 +32,6 @@ class DBHelper:
         )
 
     async def add_record(self, record: ModelType | list) -> ModelType | None:
-        logger.info(record)
         async with self.session_factory() as session:
             try:
                 if isinstance(record, list):
@@ -170,33 +169,33 @@ class DBHelper:
 
     async def edit(self, edited_model: ModelType | list) -> ModelType | None:
         if isinstance(edited_model, list):
-            logger.info(f'Editing rows in "{edited_model[0].__tablename__}" table')
+            logger.info(f'Editing rows {[el.id for el in edited_model]} in "{edited_model[0].__tablename__}" table')
         else:
             logger.info(f'Editing row with {edited_model.id} id in "{edited_model.__tablename__}" table')
         return await self.add_record(edited_model)
 
-    async def delete(self, model: ModelType | list) -> None:
-        if not isinstance(model, list):
-            models = [model]
+    async def delete(self, models: ModelType | list) -> None:
+        if not isinstance(models, list):
+            models = [models]
         ids = [model.id for model in models]
-        logger.info(f'Deleting rows with {", ".join(ids)} ids from {models[0].__tablename__} table')
-        query = delete(type(models[0])).where(models[0].id.in_(ids))
+        logger.info(f'Deleting rows with {", ".join(map(str, ids))} ids from "{models[0].__tablename__}" table')
+        query = delete(type(models[0])).where(type(models[0]).id.in_(ids))
         await self._exec_stmt(query)
 
     async def get_all_from_table(self, model: ModelType, limit: int = None):
-        logger.info(f'Getting all rows from {model.__tablename__} table')
+        logger.info(f'Getting all rows from "{model.__tablename__}" table')
         query = select(model).options(joinedload('*')).limit(limit).order_by(model.id)
         result = await self._exec_stmt(query)
         return result.scalars().all()
 
     async def get_row_by_id(self, id_: int, model: ModelType) -> ModelType:
-        logger.info(f'Getting row with {id_} id from {model.__tablename__} table')
+        logger.info(f'Getting row with {id_} id from "{model.__tablename__}" table')
         query = select(model).where(model.id == id_).options(joinedload('*'))
         result = await self._exec_stmt(query)
         return result.scalars().first()
 
     async def get_rows_by_id(self, ids: list[int], model: ModelType) -> Sequence[ModelType]:
-        logger.info(f'Getting rows with {", ".join(map(str, ids))} ids from {model.__tablename__} table')
+        logger.info(f'Getting rows with {", ".join(map(str, ids))} ids from "{model.__tablename__}" table')
         query = select(model).filter(model.id.in_(ids)).order_by(model.id).options(joinedload('*'))
         result = await self._exec_stmt(query)
         return result.scalars().all()
