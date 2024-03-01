@@ -168,12 +168,12 @@ class DBHelper:
             )
         )
 
-    async def edit(self, edited_model: ModelType | list) -> None:
+    async def edit(self, edited_model: ModelType | list) -> ModelType | None:
         if isinstance(edited_model, list):
-            logger.info(f'Editing rows in {edited_model[0].__tablename__} table')
+            logger.info(f'Editing rows in "{edited_model[0].__tablename__}" table')
         else:
-            logger.info(f'Editing row with {edited_model.id} id in {edited_model.__tablename__} table')
-        await self.add_record(edited_model)
+            logger.info(f'Editing row with {edited_model.id} id in "{edited_model.__tablename__}" table')
+        return await self.add_record(edited_model)
 
     async def delete(self, model: ModelType | list) -> None:
         if not isinstance(model, list):
@@ -384,7 +384,7 @@ class DBHelper:
             model: ModelType,
             delete_model: bool = False,
             delete_models_email: bool = False
-    ) -> None:
+    ) -> ModelType | None:
         if isinstance(profile_ids, int):
             profile_ids = [profile_ids]
         logger.info(f'Changing {model.__name__.lower()} for {profile_ids} profiles')
@@ -397,10 +397,10 @@ class DBHelper:
         elif model == Email:
             free_models_rows = await self.get_free_emails(limit=len(profile_ids))
         for profile, model in zip(profiles, free_models_rows):
-            logger.info(f'{profile.id} | Old {model.__name__.lower()} {getattr(profile, model.__name__.lower())}')
-            setattr(profile, model.__name__.lower(), model)
-            logger.info(f'{profile.id} | New {model.__name__.lower()} {getattr(profile, model.__name__.lower())}')
-        await self.edit(profiles)
+            logger.info(f'{profile.id} | Old {type(model).__name__.lower()} {getattr(profile, type(model).__name__.lower())}')
+            setattr(profile, type(model).__name__.lower(), model)
+            logger.info(f'{profile.id} | New {type(model).__name__.lower()} {getattr(profile, type(model).__name__.lower())}')
+        edited_profile = await self.edit(profiles)
         if delete_model:
             logger.info(f"{model.__tablename__.capitalize()} {models_to_delete} will be deleted")
             emails_to_delete = [getattr(model, 'email') for model in models_to_delete]
@@ -408,3 +408,4 @@ class DBHelper:
             if delete_models_email:
                 logger.info(f'Emails {emails_to_delete} will be deleted')
                 await self.delete(emails_to_delete)
+        return edited_profile
