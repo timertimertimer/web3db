@@ -286,6 +286,18 @@ class DBHelper:
         result = await self._exec_stmt(query)
         return result.scalars().all()
 
+    async def get_profiles_with_totp_by_model(self, model: ModelType, limit: int = None) -> Sequence[Profile]:
+        logger.info(f'Getting {model.__name__.lower()} profiles with totp (light with social)')
+        query = (
+            select(Profile)
+            .join(model)
+            .where(model.totp_secret != None)
+            .options(joinedload(getattr(Profile, model.__name__.lower())))
+            .limit(limit)
+        )
+        result = await self._exec_stmt(query)
+        return result.scalars().all()
+
     async def get_potential_profiles(self, limit: int = None) -> list[Profile]:
         free_proxies: list[Proxy] = await self.get_free_proxies(limit=limit)
         free_proxies_count = sum([el[-1] for el in free_proxies])
@@ -396,9 +408,11 @@ class DBHelper:
         elif model == Email:
             free_models_rows = await self.get_free_emails(limit=len(profile_ids))
         for profile, model in zip(profiles, free_models_rows):
-            logger.info(f'{profile.id} | Old {type(model).__name__.lower()} {getattr(profile, type(model).__name__.lower())}')
+            logger.info(
+                f'{profile.id} | Old {type(model).__name__.lower()} {getattr(profile, type(model).__name__.lower())}')
             setattr(profile, type(model).__name__.lower(), model)
-            logger.info(f'{profile.id} | New {type(model).__name__.lower()} {getattr(profile, type(model).__name__.lower())}')
+            logger.info(
+                f'{profile.id} | New {type(model).__name__.lower()} {getattr(profile, type(model).__name__.lower())}')
         edited_profile = await self.edit(profiles)
         if delete_model:
             logger.info(f"{model.__tablename__.capitalize()} {models_to_delete} will be deleted")

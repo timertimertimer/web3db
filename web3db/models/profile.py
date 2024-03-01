@@ -39,9 +39,10 @@ class Profile(
     okx_solana_address: Mapped[str] = mapped_column(String, nullable=True, unique=True)
 
     def __repr__(self):
-        return (f'{self.id}:{self.email.login}:{self.twitter.login if self.twitter else None}:'
-                f'{self.discord.login if self.discord else None}:'
-                f'{self.proxy.proxy_string if self.proxy else None}')
+        return (
+            f'{self.id}:{self.email.login if self.email else None}:{self.twitter.login if self.twitter else None}:'
+            f'{self.discord.login if self.discord else None}:{self.proxy.proxy_string if self.proxy else None}'
+        )
 
     def __str__(self):
         return repr(self)
