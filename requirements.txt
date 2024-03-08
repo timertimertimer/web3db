@@ -5,5 +5,4 @@ asyncpg
 aptos-sdk
 sqlalchemy
 eth_account
-eth_account
 python-gnupg
