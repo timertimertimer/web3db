@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="web3db",
-    version='0.0.1',
+    version='1.0.0',
     author="timer",
     author_email="timerkhan2002@gmail.com",
     description='Web3 database',
