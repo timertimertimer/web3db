@@ -1,10 +1,13 @@
 import random
-from typing import Union
+from typing import Union, Callable
 
 import base58
+from mnemonic import Mnemonic
 from eth_account import Account as EVMAccount
 from aptos_sdk.account import Account as AptosAccount
 from solana.rpc.api import Keypair
+from bitcoinutils.hdwallet import HDWallet
+from bitcoinutils.setup import setup
 from sqlalchemy import Result, func, Sequence, delete, and_, not_, desc, Select, Update, Delete, case
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
@@ -18,6 +21,11 @@ from web3db.utils.encrypt_private import encrypt
 ModelType = Union[type(Email), type(Discord), type(Twitter), type(Github), type(Proxy), type(Profile)]
 INDIVIDUAL_PROXY_LIMIT = 3
 SHARED_PROXY_LIMIT = 1
+setup('mainnet')
+
+
+def prepare_strings(*s):
+    return [string.strip() if string else string for string in s]
 
 
 class DBHelper:
@@ -30,6 +38,12 @@ class DBHelper:
             autocommit=False,
             expire_on_commit=False
         )
+
+    def prepare_values(func: Callable):
+        async def wrapper(self, *args):
+            return await func(self, *prepare_strings(*args))
+
+        return wrapper
 
     async def add_record(self, record: ModelType | list) -> ModelType | None:
         async with self.session_factory() as session:
@@ -65,10 +79,12 @@ class DBHelper:
         result = await self._exec_stmt(query)
         return result.scalars().first()
 
+    @prepare_values
     async def add_email(self, login: str, password: str) -> None:
         logger.info(f'Adding Email {login}:{password}')
         await self.add_record(Email(login=login, password=password))
 
+    @prepare_values
     async def add_twitter(
             self,
             auth_token: str,
@@ -77,18 +93,25 @@ class DBHelper:
             email: str = None,
             email_password: str = None
     ) -> None:
+        (
+            auth_token, login, password,
+            email, email_password
+        ) = prepare_strings(auth_token, login, password, email, email_password)
         logger.info(f'Adding Twitter {auth_token}')
-        mail = (await self.get_row_by_login(email, Email)
-                or Email(login=email, password=email_password)) if email else None
+        if email:
+            email.strip()
+            email = (await self.get_row_by_login(email, Email)
+                     or Email(login=email, password=email_password))
         await self.add_record(
             Twitter(
-                login=login,
-                password=password,
+                login=login.strip() if login else login,
+                password=password.strip() if password else password,
                 auth_token=auth_token,
-                mail=mail
+                email=email
             )
         )
 
+    @prepare_values
     async def add_discord(
             self,
             auth_token: str,
@@ -108,15 +131,18 @@ class DBHelper:
             )
         )
 
+    @prepare_values
     async def add_proxy(self, proxy_string: str) -> None:
         logger.info(f'Adding Proxy {proxy_string}')
         await self.add_record(Proxy(proxy_string=proxy_string))
 
+    @prepare_values
     async def add_github(self, login: str, password: str, email_password: str = None):
         logger.info(f'Adding Github {login}')
         email = (await self.get_row_by_login(login=login, model=Email)) or Email(login=login, password=email_password)
         await self.add_record(Github(login=login, password=password, email=email))
 
+    @prepare_values
     async def add_profile(
             self,
             proxy_string: str,
@@ -126,6 +152,7 @@ class DBHelper:
             evm_private: str,
             aptos_private: str,
             solana_private: str,
+            btc_mnemo: str,
             recipient: str,
             passphrase: str
     ) -> None:
@@ -149,6 +176,12 @@ class DBHelper:
         evm_account = EVMAccount.from_key(evm_private)
         aptos_account = AptosAccount.load_key(aptos_private)
         solana_keypair = Keypair.from_base58_string(solana_private)
+        btc_hdwallet = HDWallet(mnemonic=btc_mnemo)
+        btc_hdwallet.from_path("m/84'/0'/0'/0/0")
+        btc_native_segwit_address = btc_hdwallet.get_private_key().get_public_key().get_segwit_address().to_string()
+        btc_hdwallet.from_path("m/86'/0'/0'/0/0")
+        btc_taproot_address = btc_hdwallet.get_private_key().get_public_key().get_taproot_address().to_string()
+        btc_mnemo_encoded = encrypt(btc_mnemo, recipient, passphrase)
         evm_private_encoded = encrypt(evm_private, recipient, passphrase)
         aptos_private_encoded = encrypt(aptos_private, recipient, passphrase)
         solana_private_encoded = encrypt(solana_private, recipient, passphrase)
@@ -161,9 +194,12 @@ class DBHelper:
                 evm_address=evm_account.address,
                 aptos_address=str(aptos_account.address()),
                 solana_address=str(solana_keypair.pubkey()),
+                btc_native_segwit_address=btc_native_segwit_address,
+                btc_taproot_address=btc_taproot_address,
                 evm_private=evm_private_encoded,
                 aptos_private=aptos_private_encoded,
-                solana_private=solana_private_encoded
+                solana_private=solana_private_encoded,
+                btc_mnemo=btc_mnemo_encoded
             )
         )
 
@@ -330,6 +366,8 @@ class DBHelper:
             evm_account = EVMAccount.create()
             aptos_account = AptosAccount.generate()
             solana_keypair = Keypair()
+            btc_mnemo = Mnemonic().generate(256)
+            btc_hdwallet = HDWallet(mnemonic=btc_mnemo)
             profile.evm_private = encrypt(evm_account.key.hex(), recipient, passphrase)
             profile.evm_address = evm_account.address
             profile.aptos_private = encrypt(aptos_account.private_key.hex(), recipient, passphrase)
@@ -339,6 +377,15 @@ class DBHelper:
                 recipient, passphrase
             )
             profile.solana_address = str(solana_keypair.pubkey())
+            profile.btc_mnemo = encrypt(btc_mnemo, recipient, passphrase)
+            btc_hdwallet.from_path("m/84'/0'/0'/0/0")
+            profile.btc_native_segwit_address = (
+                btc_hdwallet.get_private_key().get_public_key().get_segwit_address().to_string()
+            )
+            btc_hdwallet.from_path("m/86'/0'/0'/0/0")
+            profile.btc_taproot_address = (
+                btc_hdwallet.get_private_key().get_public_key().get_taproot_address().to_string()
+            )
         result = await self.add_record(potential_profiles)
         return result
 

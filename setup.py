@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="web3db",
-    version='1.0.0',
+    version='1.0.1',
     author="timer",
     author_email="timerkhan2002@gmail.com",
     description='Web3 database',
@@ -11,7 +11,7 @@ setup(
     install_requires=[
         'python-gnupg', 'loguru',
         'sqlalchemy', 'asyncpg',
-        'eth_account', 'aptos-sdk', 'solana', 'base58'
+        'eth_account', 'aptos-sdk', 'solana', 'base58', 'bitcoin-utils'
     ],
     project_urls={
         "GitHub": "https://github.com/timertimertimer/web3db",

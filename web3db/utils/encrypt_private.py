@@ -1,14 +1,23 @@
+import os
+
 import gnupg
 from eth_account import Account
 
 from .logger import logger
 from ..models import Profile
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 gpg = gnupg.GPG()
 gpg.encoding = 'utf-8'
 
+passphrase = os.getenv('PASSPHRASE')
+recipient = 'timerkhan2002@gmail.com'
 
-def encrypt(data: str, recipient: str, passphrase: str) -> str:
+
+def encrypt(data: str) -> str:
     status = gpg.encrypt(
         data=data,
         recipients=recipient,
@@ -19,12 +28,12 @@ def encrypt(data: str, recipient: str, passphrase: str) -> str:
     return status.data.decode('utf-8')
 
 
-def decrypt(encoded_data: str, passphrase: str, echo: bool = False) -> str:
+def decrypt(encoded_data: str, echo: bool = False) -> str:
     status = gpg.decrypt(encoded_data, passphrase=passphrase)
     if echo:
         logger.info(status.status)
     return status.data.decode('utf-8')
 
 
-def get_wallets(profiles: list[Profile], passphrase: str) -> list[Account]:
+def get_wallets(profiles: list[Profile]) -> list[Account]:
     return [Account.from_key(decrypt(profile.evm_private, passphrase)) for profile in profiles]
