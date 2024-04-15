@@ -1,9 +1,0 @@
-base58
-loguru
-solana
-asyncpg
-aptos-sdk
-sqlalchemy
-eth_account
-python-gnupg
-bitcoin-utils

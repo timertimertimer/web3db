@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "web3db"
+version = "1.0.1"
+description = "Database for web3"
+authors = ["timertimertimer <timerkhan2002@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+base58 = "^2.1.1"
+loguru = "^0.7.2"
+solana = "^0.33.0"
+asyncpg = "^0.29.0"
+aptos-sdk = "0.7.1"
+SQLAlchemy = "^2.0.29"
+eth-account = "^0.12.2"
+python-gnupg = "^0.5.2"
+bitcoin-utils = "^0.6.6"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
