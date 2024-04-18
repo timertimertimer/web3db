@@ -8,7 +8,7 @@ from aptos_sdk.account import Account as AptosAccount
 from solana.rpc.api import Keypair
 from bitcoinutils.hdwallet import HDWallet
 from bitcoinutils.setup import setup
-from sqlalchemy import Result, func, Sequence, delete, and_, not_, desc, Select, Update, Delete, case
+from sqlalchemy import Result, func, delete, and_, not_, desc, Select, Update, Delete, case
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy.future import select
@@ -79,130 +79,6 @@ class DBHelper:
         result = await self._exec_stmt(query)
         return result.scalars().first()
 
-    @prepare_values
-    async def add_email(self, login: str, password: str) -> None:
-        logger.info(f'Adding Email {login}:{password}')
-        await self.add_record(Email(login=login, password=password))
-
-    @prepare_values
-    async def add_twitter(
-            self,
-            auth_token: str,
-            login: str = None,
-            password: str = None,
-            email: str = None,
-            email_password: str = None
-    ) -> None:
-        (
-            auth_token, login, password,
-            email, email_password
-        ) = prepare_strings(auth_token, login, password, email, email_password)
-        logger.info(f'Adding Twitter {auth_token}')
-        if email:
-            email.strip()
-            email = (await self.get_row_by_login(email, Email)
-                     or Email(login=email, password=email_password))
-        await self.add_record(
-            Twitter(
-                login=login.strip() if login else login,
-                password=password.strip() if password else password,
-                auth_token=auth_token,
-                email=email
-            )
-        )
-
-    @prepare_values
-    async def add_discord(
-            self,
-            auth_token: str,
-            login: str = None,
-            password: str = None,
-            email_password: str = None
-    ) -> None:
-        logger.info(f'Adding Discord {auth_token}')
-        email = ((await self.get_row_by_login(login, Email))
-                 or Email(login=login, password=email_password)) if login else None
-        await self.add_record(
-            Discord(
-                login=login,
-                password=password,
-                auth_token=auth_token,
-                email=email
-            )
-        )
-
-    @prepare_values
-    async def add_proxy(self, proxy_string: str) -> None:
-        logger.info(f'Adding Proxy {proxy_string}')
-        await self.add_record(Proxy(proxy_string=proxy_string))
-
-    @prepare_values
-    async def add_github(self, login: str, password: str, email_password: str = None):
-        logger.info(f'Adding Github {login}')
-        email = (await self.get_row_by_login(login=login, model=Email)) or Email(login=login, password=email_password)
-        await self.add_record(Github(login=login, password=password, email=email))
-
-    @prepare_values
-    async def add_profile(
-            self,
-            proxy_string: str,
-            email: str,
-            discord_login: str,
-            twitter_login: str,
-            evm_private: str,
-            aptos_private: str,
-            solana_private: str,
-            btc_mnemo: str,
-            recipient: str,
-            passphrase: str
-    ) -> None:
-        logger.info(f'Adding Profile {email}:{proxy_string}')
-        mail = await self.get_row_by_login(email, Email)
-        if not mail:
-            logger.error(f'Need email {email}')
-            return
-        discord = await self.get_row_by_login(discord_login, Discord)
-        if not discord:
-            logger.error(f'Need discord {discord_login}')
-            return
-        twitter = await self.get_row_by_login(twitter_login, Twitter)
-        if not twitter:
-            logger.error(f'Need twitter {twitter_login}')
-            return
-        proxy = await self.get_row_by_login(proxy_string, Proxy)
-        if not proxy:
-            logger.error(f'Need proxy {proxy_string}')
-            return
-        evm_account = EVMAccount.from_key(evm_private)
-        aptos_account = AptosAccount.load_key(aptos_private)
-        solana_keypair = Keypair.from_base58_string(solana_private)
-        btc_hdwallet = HDWallet(mnemonic=btc_mnemo)
-        btc_hdwallet.from_path("m/84'/0'/0'/0/0")
-        btc_native_segwit_address = btc_hdwallet.get_private_key().get_public_key().get_segwit_address().to_string()
-        btc_hdwallet.from_path("m/86'/0'/0'/0/0")
-        btc_taproot_address = btc_hdwallet.get_private_key().get_public_key().get_taproot_address().to_string()
-        btc_mnemo_encoded = encrypt(btc_mnemo, recipient, passphrase)
-        evm_private_encoded = encrypt(evm_private, recipient, passphrase)
-        aptos_private_encoded = encrypt(aptos_private, recipient, passphrase)
-        solana_private_encoded = encrypt(solana_private, recipient, passphrase)
-        await self.add_record(
-            Profile(
-                proxy=proxy,
-                email=email,
-                discord=discord,
-                twitter=twitter,
-                evm_address=evm_account.address,
-                aptos_address=str(aptos_account.address()),
-                solana_address=str(solana_keypair.pubkey()),
-                btc_native_segwit_address=btc_native_segwit_address,
-                btc_taproot_address=btc_taproot_address,
-                evm_private=evm_private_encoded,
-                aptos_private=aptos_private_encoded,
-                solana_private=solana_private_encoded,
-                btc_mnemo=btc_mnemo_encoded
-            )
-        )
-
     async def edit(self, edited_model: ModelType | list) -> ModelType | None:
         if isinstance(edited_model, list):
             logger.info(f'Editing rows {[el.id for el in edited_model]} in "{edited_model[0].__tablename__}" table')
@@ -230,7 +106,7 @@ class DBHelper:
         result = await self._exec_stmt(query)
         return result.scalars().first()
 
-    async def get_rows_by_id(self, ids: list[int], model: ModelType) -> Sequence[ModelType]:
+    async def get_rows_by_id(self, ids: list[int], model: ModelType) -> list[ModelType]:
         logger.info(f'Getting rows with {", ".join(map(str, ids))} ids from "{model.__tablename__}" table')
         query = select(model).filter(model.id.in_(ids)).order_by(model.id).options(joinedload('*'))
         result = await self._exec_stmt(query)
@@ -264,7 +140,7 @@ class DBHelper:
         result = await self._exec_stmt(query)
         return result.scalars().first()
 
-    async def get_random_profiles_by_proxy(self, limit: int = None) -> Sequence[Profile]:
+    async def get_random_profiles_by_proxy(self, limit: int = None) -> list[Profile]:
         logger.info(f'Getting random profiles by proxy')
         subquery = (
             select(
@@ -286,7 +162,7 @@ class DBHelper:
         result = await self._exec_stmt(query)
         return result.scalars().all()
 
-    async def get_random_profiles_ids_by_proxy(self, limit: int = None) -> Sequence[int]:
+    async def get_random_profiles_ids_by_proxy(self, limit: int = None) -> list[int]:
         logger.info(f'Getting random profiles by proxy (light with social)')
         subquery = (
             select(
@@ -308,7 +184,7 @@ class DBHelper:
         result = await self._exec_stmt(query)
         return result.scalars().all()
 
-    async def get_ready_profiles_by_model(self, model: ModelType, limit: int = None) -> Sequence[Profile]:
+    async def get_ready_profiles_by_model(self, model: ModelType, limit: int = None) -> list[Profile]:
         logger.info(f'Getting ready {model.__name__.lower()} profiles')
         query = (
             select(Profile).join(model).where(model.ready).options(joinedload('*')).limit(limit).order_by(Profile.id)
@@ -316,13 +192,13 @@ class DBHelper:
         result = await self._exec_stmt(query)
         return result.scalars().all()
 
-    async def get_ready_profiles_ids_by_model(self, model: ModelType, limit: int = None) -> Sequence[int]:
+    async def get_ready_profiles_ids_by_model(self, model: ModelType, limit: int = None) -> list[int]:
         logger.info(f'Getting ready {model.__name__.lower()} profiles (light with social)')
         query = select(Profile.id).join(model).where(model.ready).limit(limit)
         result = await self._exec_stmt(query)
         return result.scalars().all()
 
-    async def get_profiles_with_totp_by_model(self, model: ModelType, limit: int = None) -> Sequence[Profile]:
+    async def get_profiles_with_totp_by_model(self, model: ModelType, limit: int = None) -> list[Profile]:
         logger.info(f'Getting {model.__name__.lower()} profiles with totp (light with social)')
         query = (
             select(Profile)
@@ -336,26 +212,26 @@ class DBHelper:
         return result.scalars().all()
 
     async def get_potential_profiles(self, limit: int = None) -> list[Profile]:
-        free_proxies: list[Proxy] = await self.get_free_proxies(limit=limit)
-        free_proxies_count = sum([el[-1] for el in free_proxies])
-        free_emails: list[Email] = await self.get_free_emails(limit=limit or free_proxies_count)
-        free_discords: list[Discord] = await self.get_free_model(Discord, limit=limit or free_proxies_count)
-        free_twitters: list[Twitter] = await self.get_free_model(Twitter, limit=limit or free_proxies_count)
-        free_proxies_all = []
-        for free_proxy, n in free_proxies:
-            free_proxies_all += [free_proxy] * n
-        random.shuffle(free_proxies_all)
+        unused_proxies: list[tuple[Proxy, int]] = await self.get_unused_proxies(limit=limit)
+        unused_proxies_count = sum([el[-1] for el in unused_proxies])
+        unused_emails: list[Email] = await self.get_unused_emails(limit=limit or unused_proxies_count)
+        unused_discords: list[Discord] = await self.get_unused_model(Discord, limit=limit or unused_proxies_count)
+        unused_twitters: list[Twitter] = await self.get_unused_model(Twitter, limit=limit or unused_proxies_count)
+        unused_proxies_all = []
+        for unused_proxy, n in unused_proxies:
+            unused_proxies_all += [unused_proxy] * n
+        random.shuffle(unused_proxies_all)
         potential_profiles = []
-        for i, free_proxy in enumerate(free_proxies_all):
+        for i, unused_proxy in enumerate(unused_proxies_all):
             potential_profiles.append(Profile(
-                email=free_emails[i] if i < len(free_emails) else None,
-                discord=free_discords[i] if i < len(free_discords) else None,
-                twitter=free_twitters[i] if i < len(free_twitters) else None,
-                proxy=free_proxy
+                email=unused_emails[i] if i < len(unused_emails) else None,
+                discord=unused_discords[i] if i < len(unused_discords) else None,
+                twitter=unused_twitters[i] if i < len(unused_twitters) else None,
+                proxy=unused_proxy
             ))
         return potential_profiles
 
-    async def create_profiles_from_free(
+    async def create_profiles(
             self,
             recipient: str,
             passphrase: str,
@@ -389,8 +265,8 @@ class DBHelper:
         result = await self.add_record(potential_profiles)
         return result
 
-    async def get_free_emails(self, limit: int = None) -> Sequence[Email]:
-        logger.info(f'Getting free mails')
+    async def get_unused_emails(self, limit: int = None) -> list[Email]:
+        logger.info(f'Getting unused mails')
         subquery = (
             select(Twitter.email_id)
             .where(Twitter.email_id.isnot(None))
@@ -405,12 +281,12 @@ class DBHelper:
         result = await self._exec_stmt(query)
         return result.scalars().all()
 
-    async def get_free_model(
+    async def get_unused_model(
             self,
             model: type(Twitter) | type(Discord) | type(Github),
             limit: int = None
-    ) -> Sequence[Twitter | Discord | Github]:
-        logger.info(f'Getting free {model.__tablename__}')
+    ) -> list[Twitter | Discord | Github]:
+        logger.info(f'Getting unused {model.__tablename__}')
         query = (
             select(model)
             .where(~model.id.in_(
@@ -423,8 +299,8 @@ class DBHelper:
         result = await self._exec_stmt(query)
         return result.scalars().all()
 
-    async def get_free_proxies(self, limit: int = None) -> Sequence[Proxy]:
-        logger.info(f'Getting free proxies')
+    async def get_unused_proxies(self, limit: int = None) -> list[tuple[Proxy, int]]:
+        logger.info(f'Getting unused proxies')
         query = (
             select(Proxy, case(
                 (Proxy.proxy_type == 'individual', INDIVIDUAL_PROXY_LIMIT - func.count(Profile.proxy_id)),
@@ -449,13 +325,14 @@ class DBHelper:
         logger.info(f'Changing {model.__name__.lower()} for {profile_ids} profiles')
         profiles: list[Profile] = await self.get_rows_by_id(profile_ids, Profile)
         models_to_delete: list[model] = [getattr(profile, model.__name__.lower()) for profile in profiles]
+        unused_models_rows = []
         if model in (Twitter, Discord, Github):
-            free_models_rows = await self.get_free_model(model, limit=len(profile_ids))
+            unused_models_rows = await self.get_unused_model(model, limit=len(profile_ids))
         elif model == Proxy:
-            free_models_rows = await self.get_free_proxies(limit=len(profile_ids))
+            unused_models_rows = await self.get_unused_proxies(limit=len(profile_ids))
         elif model == Email:
-            free_models_rows = await self.get_free_emails(limit=len(profile_ids))
-        for profile, model in zip(profiles, free_models_rows):
+            unused_models_rows = await self.get_unused_emails(limit=len(profile_ids))
+        for profile, model in zip(profiles, unused_models_rows):
             logger.info(
                 f'{profile.id} | Old {type(model).__name__.lower()} {getattr(profile, type(model).__name__.lower())}')
             setattr(profile, type(model).__name__.lower(), model)

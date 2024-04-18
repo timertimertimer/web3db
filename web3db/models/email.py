@@ -18,6 +18,7 @@ class Email(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     login: Mapped[str] = mapped_column(String, unique=True)
     password: Mapped[str] = mapped_column(String)
+    totp_secret: Mapped[str] = mapped_column(String, nullable=True)
 
     discord: Mapped['Discord'] = relationship(back_populates='email')
     twitter: Mapped['Twitter'] = relationship(back_populates='email')
