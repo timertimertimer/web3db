@@ -1,8 +1,6 @@
 import gnupg
-from eth_account import Account
 
 from .logger import logger
-from ..models import Profile
 
 gpg = gnupg.GPG()
 gpg.encoding = 'utf-8'
