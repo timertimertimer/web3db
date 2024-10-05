@@ -1,21 +1,20 @@
 import random
-from typing import Union, Callable
-
 import base58
+from typing import Union
 from mnemonic import Mnemonic
 from eth_account import Account as EVMAccount
 from aptos_sdk.account import Account as AptosAccount
 from solana.rpc.api import Keypair
 from bitcoinutils.hdwallet import HDWallet
 from bitcoinutils.setup import setup
-from sqlalchemy import Result, func, delete, and_, not_, desc, Select, Update, Delete, case
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy import func, and_, not_, desc, case
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 
+from web3db.base import BaseDBHelper
 from web3db.models import *
-from web3db.utils import logger
+from web3db.models import RemoteProfile as Profile
+from web3db.utils import my_logger
 from web3db.utils.encrypt_private import encrypt
 
 ModelType = Union[type(Email), type(Discord), type(Twitter), type(Github), type(Proxy), type(Profile)]
@@ -24,93 +23,14 @@ SHARED_PROXY_LIMIT = 1
 setup('mainnet')
 
 
-def prepare_strings(*s):
-    return [string.strip() if string else string for string in s]
-
-
-class DBHelper:
-
-    def __init__(self, url: str, echo: bool = False):
-        self.engine = create_async_engine(url=url, echo=echo)
-        self.session_factory = async_sessionmaker(
-            bind=self.engine,
-            autoflush=False,
-            autocommit=False,
-            expire_on_commit=False
-        )
-
-    def prepare_values(func: Callable):
-        async def wrapper(self, *args):
-            return await func(self, *prepare_strings(*args))
-
-        return wrapper
-
-    async def add_record(self, record: ModelType | list) -> ModelType | None:
-        async with self.session_factory() as session:
-            try:
-                if isinstance(record, list):
-                    session.add_all(record)
-                else:
-                    session.add(record)
-                await session.commit()
-                return record
-            except IntegrityError as e:
-                await session.rollback()
-                logger.debug(e)
-
-    async def _exec_stmt(
-            self,
-            stmt: Select | Delete | Update | list
-    ) -> Result:
-        logger.info(stmt)
-        async with self.session_factory() as session:
-            if not isinstance(stmt, list):
-                stmt = [stmt]
-            for s in stmt:
-                result = await session.execute(s)
-            await session.commit()
-            return result
-
+class DBHelper(BaseDBHelper):
     async def get_row_by_login(self, login: str, model) -> ModelType | None:
         if model == Proxy:
             query = select(model).where(model.proxy_string == login).options(joinedload('*'))
         else:
             query = select(model).where(model.login == login).options(joinedload('*'))
-        result = await self._exec_stmt(query)
+        result = await self.execute_query(query)
         return result.scalars().first()
-
-    async def edit(self, edited_model: ModelType | list) -> ModelType | None:
-        if isinstance(edited_model, list):
-            logger.info(f'Editing rows {[el.id for el in edited_model]} in "{edited_model[0].__tablename__}" table')
-        else:
-            logger.info(f'Editing row with {edited_model.id} id in "{edited_model.__tablename__}" table')
-        return await self.add_record(edited_model)
-
-    async def delete(self, models: ModelType | list) -> None:
-        if not isinstance(models, list):
-            models = [models]
-        ids = [model.id for model in models]
-        logger.info(f'Deleting rows with {", ".join(map(str, ids))} ids from "{models[0].__tablename__}" table')
-        query = delete(type(models[0])).where(type(models[0]).id.in_(ids))
-        await self._exec_stmt(query)
-
-    async def get_all_from_table(self, model: ModelType, limit: int = None):
-        logger.info(f'Getting all rows from "{model.__tablename__}" table')
-        query = select(model).options(joinedload('*')).limit(limit).order_by(model.id)
-        result = await self._exec_stmt(query)
-        return result.scalars().all()
-
-    async def get_row_by_id(self, id_: int, model: ModelType) -> ModelType:
-        logger.info(f'Getting row with {id_} id from "{model.__tablename__}" table')
-        query = select(model).where(model.id == id_).options(joinedload('*'))
-        result = await self._exec_stmt(query)
-        return result.scalars().first()
-
-    async def get_rows_by_id(self, ids: list[int], model: ModelType) -> list[ModelType]:
-        logger.info(f'Getting rows with {", ".join(map(str, ids))} ids from "{model.__tablename__}" table')
-        query = select(model).filter(model.id.in_(ids)).order_by(model.id).options(joinedload('*'))
-        result = await self._exec_stmt(query)
-        return result.scalars().all()
 
     async def get_profiles_light_by_model(
             self,
@@ -118,30 +38,30 @@ class DBHelper:
             ids: list[int] = None,
             limit: int = None
     ) -> list[tuple[int, str, bool]]:
-        logger.info(f'Getting profiles by id (light with model)')
+        my_logger.info(f'Getting profiles by id (light with model)')
         query = (
             select(Profile.id, model.proxy_string if model == Proxy else model.login, model.ready)
             .join(model).order_by(Profile.id)
         )
         if ids:
             query = query.filter(Profile.id.in_(ids))
-        result = await self._exec_stmt(query.limit(limit))
+        result = await self.execute_query(query.limit(limit))
         return [tuple(el) for el in result.all()]
 
     async def get_profile_by_models_login(self, model: ModelType, login: str) -> Profile:
-        logger.info(f'Getting {model.__name__} by login - {login}')
+        my_logger.info(f'Getting {model.__name__} by login - {login}')
         query = select(Profile).where(model.login == login).options(joinedload('*'))
-        result = await self._exec_stmt(query)
+        result = await self.execute_query(query)
         return result.scalars().first()
 
     async def get_random_profile(self) -> Profile:
-        logger.info(f'Getting random profile')
+        my_logger.info(f'Getting random profile')
         query = select(Profile).order_by(func.random()).options(joinedload('*'))
-        result = await self._exec_stmt(query)
+        result = await self.execute_query(query)
         return result.scalars().first()
 
     async def get_random_profiles_by_proxy(self, limit: int = None) -> list[Profile]:
-        logger.info(f'Getting random profiles by proxy')
+        my_logger.info(f'Getting random profiles by proxy')
         subquery = (
             select(
                 func.row_number().over(
@@ -159,11 +79,11 @@ class DBHelper:
             .options(joinedload('*'))
             .limit(limit)
         )
-        result = await self._exec_stmt(query)
+        result = await self.execute_query(query)
         return result.scalars().all()
 
     async def get_random_profiles_ids_by_proxy(self, limit: int = None) -> list[int]:
-        logger.info(f'Getting random profiles by proxy (light with social)')
+        my_logger.info(f'Getting random profiles by proxy (light with social)')
         subquery = (
             select(
                 func.row_number().over(
@@ -181,25 +101,25 @@ class DBHelper:
             .where(subquery.c.rn == 1)
             .limit(limit)
         )
-        result = await self._exec_stmt(query)
+        result = await self.execute_query(query)
         return result.scalars().all()
 
     async def get_ready_profiles_by_model(self, model: ModelType, limit: int = None) -> list[Profile]:
-        logger.info(f'Getting ready {model.__name__.lower()} profiles')
+        my_logger.info(f'Getting ready {model.__name__.lower()} profiles')
         query = (
             select(Profile).join(model).where(model.ready).options(joinedload('*')).limit(limit).order_by(Profile.id)
         )
-        result = await self._exec_stmt(query)
+        result = await self.execute_query(query)
         return result.scalars().all()
 
     async def get_ready_profiles_ids_by_model(self, model: ModelType, limit: int = None) -> list[int]:
-        logger.info(f'Getting ready {model.__name__.lower()} profiles (light with social)')
+        my_logger.info(f'Getting ready {model.__name__.lower()} profiles (light with social)')
         query = select(Profile.id).join(model).where(model.ready).limit(limit)
-        result = await self._exec_stmt(query)
+        result = await self.execute_query(query)
         return result.scalars().all()
 
     async def get_profiles_with_totp_by_model(self, model: ModelType, limit: int = None) -> list[Profile]:
-        logger.info(f'Getting {model.__name__.lower()} profiles with totp (light with social)')
+        my_logger.info(f'Getting {model.__name__.lower()} profiles with totp (light with social)')
         query = (
             select(Profile)
             .join(model)
@@ -208,7 +128,7 @@ class DBHelper:
             .limit(limit)
             .order_by(Profile.id)
         )
-        result = await self._exec_stmt(query)
+        result = await self.execute_query(query)
         return result.scalars().all()
 
     async def get_potential_profiles(self, limit: int = None) -> list[Profile]:
@@ -239,7 +159,7 @@ class DBHelper:
     ) -> list[Profile]:
         potential_profiles = await self.get_potential_profiles(limit)
         for i, profile in enumerate(potential_profiles):
-            evm_account = EVMAccount.create()
+            evm_account, evm_mnemo = EVMAccount.create_with_mnemonic()
             aptos_account = AptosAccount.generate()
             solana_keypair = Keypair()
             btc_mnemo = Mnemonic().generate(256)
@@ -266,7 +186,7 @@ class DBHelper:
         return result
 
     async def get_unused_emails(self, limit: int = None) -> list[Email]:
-        logger.info(f'Getting unused mails')
+        my_logger.info(f'Getting unused mails')
         subquery = (
             select(Twitter.email_id)
             .where(Twitter.email_id.isnot(None))
@@ -278,7 +198,7 @@ class DBHelper:
             .order_by(Email.id)
             .limit(limit)
         )
-        result = await self._exec_stmt(query)
+        result = await self.execute_query(query)
         return result.scalars().all()
 
     async def get_unused_model(
@@ -286,7 +206,7 @@ class DBHelper:
             model: type(Twitter) | type(Discord) | type(Github),
             limit: int = None
     ) -> list[Twitter | Discord | Github]:
-        logger.info(f'Getting unused {model.__tablename__}')
+        my_logger.info(f'Getting unused {model.__tablename__}')
         query = (
             select(model)
             .where(~model.id.in_(
@@ -296,11 +216,11 @@ class DBHelper:
             .options(joinedload(model.email))
             .limit(limit)
         )
-        result = await self._exec_stmt(query)
+        result = await self.execute_query(query)
         return result.scalars().all()
 
     async def get_unused_proxies(self, limit: int = None) -> list[tuple[Proxy, int]]:
-        logger.info(f'Getting unused proxies')
+        my_logger.info(f'Getting unused proxies')
         query = (
             select(Proxy, case(
                 (Proxy.proxy_type == 'individual', INDIVIDUAL_PROXY_LIMIT - func.count(Profile.proxy_id)),
@@ -310,7 +230,7 @@ class DBHelper:
                 (Proxy.proxy_type == 'shared' and func.count(Profile.proxy_id) < 2)
             ).order_by(desc('count_1')).limit(limit)
         )
-        result = await self._exec_stmt(query)
+        result = await self.execute_query(query)
         return result.all()
 
     async def change_profile_model(
@@ -322,7 +242,7 @@ class DBHelper:
     ) -> ModelType | None:
         if isinstance(profile_ids, int):
             profile_ids = [profile_ids]
-        logger.info(f'Changing {model.__name__.lower()} for {profile_ids} profiles')
+        my_logger.info(f'Changing {model.__name__.lower()} for {profile_ids} profiles')
         profiles: list[Profile] = await self.get_rows_by_id(profile_ids, Profile)
         models_to_delete: list[model] = [getattr(profile, model.__name__.lower()) for profile in profiles]
         unused_models_rows = []
@@ -333,17 +253,17 @@ class DBHelper:
         elif model == Email:
             unused_models_rows = await self.get_unused_emails(limit=len(profile_ids))
         for profile, model in zip(profiles, unused_models_rows):
-            logger.info(
+            my_logger.info(
                 f'{profile.id} | Old {type(model).__name__.lower()} {getattr(profile, type(model).__name__.lower())}')
             setattr(profile, type(model).__name__.lower(), model)
-            logger.info(
+            my_logger.info(
                 f'{profile.id} | New {type(model).__name__.lower()} {getattr(profile, type(model).__name__.lower())}')
         edited_profile = await self.edit(profiles)
         if delete_model:
-            logger.info(f"{model.__tablename__.capitalize()} {models_to_delete} will be deleted")
+            my_logger.info(f"{model.__tablename__.capitalize()} {models_to_delete} will be deleted")
             emails_to_delete = [getattr(model, 'email') for model in models_to_delete]
             await self.delete(models_to_delete)
             if delete_models_email:
-                logger.info(f'Emails {emails_to_delete} will be deleted')
+                my_logger.info(f'Emails {emails_to_delete} will be deleted')
                 await self.delete(emails_to_delete)
         return edited_profile

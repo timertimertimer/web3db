@@ -11,7 +11,7 @@ from .mixins import (
 )
 
 
-class Profile(
+class RemoteProfile(
     EmailRelationMixin,
     TwitterRelationMixin,
     DiscordRelationMixin,
@@ -31,12 +31,12 @@ class Profile(
     evm_address: Mapped[str] = mapped_column(String, unique=True)
     aptos_address: Mapped[str] = mapped_column(String, unique=True)
     solana_address: Mapped[str] = mapped_column(String, unique=True)
-    btc_native_segwit_address: Mapped[str] = mapped_column(String, unique=True, nullable=True)
-    btc_taproot_address: Mapped[str] = mapped_column(String, unique=True, nullable=True)
+    btc_native_segwit_address: Mapped[str] = mapped_column(String, unique=True)
+    btc_taproot_address: Mapped[str] = mapped_column(String, unique=True)
     evm_private: Mapped[str] = mapped_column(String)
     aptos_private: Mapped[str] = mapped_column(String)
     solana_private: Mapped[str] = mapped_column(String)
-    btc_mnemo: Mapped[str] = mapped_column(String, nullable=True)
+    btc_mnemo: Mapped[str] = mapped_column(String)
     okx_evm_address: Mapped[str] = mapped_column(String, nullable=True, unique=True)
     okx_aptos_address: Mapped[str] = mapped_column(String, nullable=True, unique=True)
     okx_solana_address: Mapped[str] = mapped_column(String, nullable=True, unique=True)
@@ -49,3 +49,11 @@ class Profile(
 
     def __str__(self):
         return repr(self)
+
+
+class LocalProfile(RemoteProfile):
+    bybit_api_key: Mapped[str] = mapped_column(String, nullable=True)
+    bybit_api_secret: Mapped[str] = mapped_column(String, nullable=True)
+    okx_api_secret: Mapped[str] = mapped_column(String, nullable=True)
+    okx_api_key: Mapped[str] = mapped_column(String, nullable=True)
+    okx_api_passphrase: Mapped[str] = mapped_column(String, nullable=True)

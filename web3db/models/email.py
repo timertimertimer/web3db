@@ -7,7 +7,7 @@ from .base import Base
 
 if TYPE_CHECKING:
     from .discord import Discord
-    from .profile import Profile
+    from .profile import RemoteProfile
     from .twitter import Twitter
     from .github import Github
 
@@ -22,7 +22,7 @@ class Email(Base):
 
     discord: Mapped['Discord'] = relationship(back_populates='email')
     twitter: Mapped['Twitter'] = relationship(back_populates='email')
-    profile: Mapped['Profile'] = relationship(back_populates='email')
+    profile: Mapped['RemoteProfile'] = relationship(back_populates='email')
     github: Mapped['Github'] = relationship(back_populates='email')
 
     def __repr__(self):

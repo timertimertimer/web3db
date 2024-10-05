@@ -7,7 +7,7 @@ from .base import Base
 from .mixins import EmailRelationMixin
 
 if TYPE_CHECKING:
-    from .profile import Profile
+    from .profile import RemoteProfile
 
 
 class Discord(EmailRelationMixin, Base):
@@ -20,7 +20,7 @@ class Discord(EmailRelationMixin, Base):
     password: Mapped[str] = mapped_column(String)
     auth_token: Mapped[str] = mapped_column(String, unique=True)
 
-    profile: Mapped['Profile'] = relationship(back_populates='discord')
+    profile: Mapped['RemoteProfile'] = relationship(back_populates='discord')
 
     def __repr__(self):
         return f'{self.id}:{self.login}:{self.password}:{self.auth_token}'

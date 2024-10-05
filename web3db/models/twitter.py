@@ -7,7 +7,7 @@ from .base import Base
 from .mixins import EmailRelationMixin
 
 if TYPE_CHECKING:
-    from .profile import Profile
+    from .profile import RemoteProfile
 
 
 class Twitter(EmailRelationMixin, Base):
@@ -23,7 +23,7 @@ class Twitter(EmailRelationMixin, Base):
     totp_secret: Mapped[str] = mapped_column(String, nullable=True)
     backup_code: Mapped[str] = mapped_column(String, nullable=True)
 
-    profile: Mapped['Profile'] = relationship(back_populates='twitter')
+    profile: Mapped['RemoteProfile'] = relationship(back_populates='twitter')
 
     def __repr__(self):
         return f'{self.id}:{self.login}:{self.password}:{self.auth_token}'
