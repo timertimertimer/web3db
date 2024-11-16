@@ -10,6 +10,8 @@ if TYPE_CHECKING:
     from .profile import RemoteProfile
     from .twitter import Twitter
     from .github import Github
+    from .bybit import ByBit
+    from .mexc import Mexc
 
 
 class Email(Base):
@@ -24,6 +26,8 @@ class Email(Base):
     twitter: Mapped['Twitter'] = relationship(back_populates='email')
     profile: Mapped['RemoteProfile'] = relationship(back_populates='email')
     github: Mapped['Github'] = relationship(back_populates='email')
+    bybit: Mapped['ByBit'] = relationship(back_populates='email')
+    mexc: Mapped['Mexc'] = relationship(back_populates='email')
 
     def __repr__(self):
         return f'{self.id}:{self.login}:{self.password}'

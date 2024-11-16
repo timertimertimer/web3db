@@ -267,3 +267,13 @@ class DBHelper(BaseDBHelper):
                 my_logger.info(f'Emails {emails_to_delete} will be deleted')
                 await self.delete(emails_to_delete)
         return edited_profile
+
+    async def get_proxies_by_string(self, s: str):
+        query = select(Proxy).where(Proxy.proxy_string.like(f"%{s}%")).options(joinedload('*'))
+        result = await self.execute_query(query)
+        return result.scalars().all()
+
+    async def get_profiles_with_shared_proxies(self):
+        query = select(Profile).join(Profile.proxy).where(Proxy.proxy_type == 'shared').options(joinedload('*'))
+        result = await self.execute_query(query)
+        return result.scalars().all()
