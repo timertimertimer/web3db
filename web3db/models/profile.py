@@ -1,5 +1,7 @@
-from sqlalchemy import String
-from sqlalchemy.orm import Mapped, mapped_column
+from typing import TYPE_CHECKING
+
+from sqlalchemy import String, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column, relationship, declared_attr
 
 from .base import Base
 from .mixins import (
@@ -7,16 +9,22 @@ from .mixins import (
     TwitterRelationMixin,
     DiscordRelationMixin,
     ProxyRelationMixin,
-    GithubRelationMixin
+    GithubRelationMixin,
+    BinanceRelationMixin,
+    ByBitRelationMixin,
+    OkxRelationMixin,
+    MexcRelationMixin
 )
 
+if TYPE_CHECKING:
+    from .deposit import BinanceDeposit, ByBitDeposit, OkxDeposit, MexcDeposit
 
-class RemoteProfile(
+
+class Profile(
     EmailRelationMixin,
-    TwitterRelationMixin,
-    DiscordRelationMixin,
+    TwitterRelationMixin, DiscordRelationMixin, GithubRelationMixin,
+    BinanceRelationMixin, ByBitRelationMixin, OkxRelationMixin, MexcRelationMixin,
     ProxyRelationMixin,
-    GithubRelationMixin,
     Base
 ):
     __tablename__ = 'profiles'
@@ -25,6 +33,10 @@ class RemoteProfile(
     _discord_back_populates = 'profile'
     _proxy_back_populates = 'profile'
     _github_back_populates = 'profile'
+    _binance_back_populates = 'profile'
+    _bybit_back_populates = 'profile'
+    _okx_back_populates = 'profile'
+    _mexc_back_populates = 'profile'
     _email_id_nullable = True
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -33,13 +45,23 @@ class RemoteProfile(
     solana_address: Mapped[str] = mapped_column(String, unique=True)
     btc_native_segwit_address: Mapped[str] = mapped_column(String, unique=True)
     btc_taproot_address: Mapped[str] = mapped_column(String, unique=True)
-    evm_private: Mapped[str] = mapped_column(String)
-    aptos_private: Mapped[str] = mapped_column(String)
-    solana_private: Mapped[str] = mapped_column(String)
-    btc_mnemo: Mapped[str] = mapped_column(String)
-    okx_evm_address: Mapped[str] = mapped_column(String, nullable=True, unique=True)
-    okx_aptos_address: Mapped[str] = mapped_column(String, nullable=True, unique=True)
-    okx_solana_address: Mapped[str] = mapped_column(String, nullable=True, unique=True)
+    evm_private: Mapped[str]
+    aptos_private: Mapped[str]
+    solana_private: Mapped[str]
+    btc_mnemo: Mapped[str]
+
+    binance_deposit_id: Mapped[int | None] = mapped_column(ForeignKey('binance_deposits.id'), nullable=True,
+                                                           unique=True)
+    binance_deposit: Mapped['BinanceDeposit'] = relationship('BinanceDeposit', back_populates='profile')
+
+    bybit_deposit_id: Mapped[int | None] = mapped_column(ForeignKey('bybit_deposits.id'), nullable=True, unique=True)
+    bybit_deposit: Mapped['ByBitDeposit'] = relationship('ByBitDeposit', back_populates='profile')
+
+    okx_deposit_id: Mapped[int | None] = mapped_column(ForeignKey('okx_deposits.id'), nullable=True, unique=True)
+    okx_deposit: Mapped['OkxDeposit'] = relationship('OkxDeposit', back_populates='profile')
+
+    mexc_deposit_id: Mapped[int | None] = mapped_column(ForeignKey('mexc_deposits.id'), nullable=True, unique=True)
+    mexc_deposit: Mapped['MexcDeposit'] = relationship('MexcDeposit', back_populates='profile')
 
     def __repr__(self):
         return (
@@ -49,11 +71,3 @@ class RemoteProfile(
 
     def __str__(self):
         return repr(self)
-
-
-class LocalProfile(RemoteProfile):
-    bybit_api_key: Mapped[str] = mapped_column(String, nullable=True)
-    bybit_api_secret: Mapped[str] = mapped_column(String, nullable=True)
-    okx_api_secret: Mapped[str] = mapped_column(String, nullable=True)
-    okx_api_key: Mapped[str] = mapped_column(String, nullable=True)
-    okx_api_passphrase: Mapped[str] = mapped_column(String, nullable=True)

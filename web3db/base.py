@@ -1,7 +1,9 @@
+from typing import Type
+
 from sqlalchemy import Select, Delete, Update, Result, delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-from sqlalchemy.orm import DeclarativeBase, joinedload
+from sqlalchemy.orm import DeclarativeBase, selectinload
 from web3db.utils import my_logger
 
 
@@ -15,6 +17,10 @@ class BaseDBHelper:
             expire_on_commit=False
         )
         self.query_echo = query_echo
+
+    async def create_all_tables(self, base: Type[DeclarativeBase]):
+        async with self.engine.begin() as conn:
+            await conn.run_sync(base.metadata.create_all)
 
     async def add_record(self, record: type(DeclarativeBase) | list) -> type(DeclarativeBase) | None:
         if self.query_echo:
@@ -52,7 +58,8 @@ class BaseDBHelper:
     async def edit(self, edited_model: type(DeclarativeBase) | list) -> type(DeclarativeBase) | None:
         if self.query_echo:
             if isinstance(edited_model, list):
-                my_logger.info(f'Editing rows {[el.id for el in edited_model]} in "{edited_model[0].__tablename__}" table')
+                my_logger.info(
+                    f'Editing rows {[el.id for el in edited_model]} in "{edited_model[0].__tablename__}" table')
             else:
                 my_logger.info(f'Editing row with {edited_model.id} id in "{edited_model.__tablename__}" table')
         return await self.add_record(edited_model)
@@ -69,20 +76,20 @@ class BaseDBHelper:
     async def get_all_from_table(self, model: type(DeclarativeBase), limit: int = None):
         if self.query_echo:
             my_logger.info(f'Getting all rows from "{model.__tablename__}" table')
-        query = select(model).options(joinedload('*')).limit(limit).order_by(model.id)
+        query = select(model).options(selectinload('*')).limit(limit).order_by(model.id)
         result = await self.execute_query(query)
         return result.scalars().all()
 
     async def get_row_by_id(self, id_: int, model: type(DeclarativeBase)) -> type(DeclarativeBase):
         if self.query_echo:
             my_logger.info(f'Getting row with {id_} id from "{model.__tablename__}" table')
-        query = select(model).where(model.id == id_).options(joinedload('*'))
+        query = select(model).where(model.id == id_).options(selectinload('*'))
         result = await self.execute_query(query)
         return result.scalars().first()
 
     async def get_rows_by_id(self, ids: list[int], model: type(DeclarativeBase)) -> list[type(DeclarativeBase)]:
         if self.query_echo:
             my_logger.info(f'Getting rows with {", ".join(map(str, ids))} ids from "{model.__tablename__}" table')
-        query = select(model).filter(model.id.in_(ids)).order_by(model.id).options(joinedload('*'))
+        query = select(model).filter(model.id.in_(ids)).order_by(model.id).options(selectinload('*'))
         result = await self.execute_query(query)
-        return result.scalars().all()
+        return result.scalars().unique().all()

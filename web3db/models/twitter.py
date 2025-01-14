@@ -7,7 +7,7 @@ from .base import Base
 from .mixins import EmailRelationMixin
 
 if TYPE_CHECKING:
-    from .profile import RemoteProfile
+    from .profile import Profile
 
 
 class Twitter(EmailRelationMixin, Base):
@@ -17,13 +17,13 @@ class Twitter(EmailRelationMixin, Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     login: Mapped[str] = mapped_column(String, unique=True)
-    password: Mapped[str] = mapped_column(String)
+    password: Mapped[str]
     auth_token: Mapped[str] = mapped_column(String, unique=True)
     ready: Mapped[bool] = mapped_column(Boolean, default=False)
-    totp_secret: Mapped[str] = mapped_column(String, nullable=True)
-    backup_code: Mapped[str] = mapped_column(String, nullable=True)
+    totp_secret: Mapped[str | None]
+    backup_code: Mapped[str | None]
 
-    profile: Mapped['RemoteProfile'] = relationship(back_populates='twitter')
+    profile: Mapped['Profile'] = relationship(back_populates='twitter')
 
     def __repr__(self):
         return f'{self.id}:{self.login}:{self.password}:{self.auth_token}'

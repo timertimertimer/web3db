@@ -7,7 +7,7 @@ from .base import Base
 from .mixins import EmailRelationMixin
 
 if TYPE_CHECKING:
-    from .profile import RemoteProfile
+    from .profile import Profile
 
 
 class Github(EmailRelationMixin, Base):
@@ -17,9 +17,9 @@ class Github(EmailRelationMixin, Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     login: Mapped[str] = mapped_column(String, unique=True)
-    password: Mapped[str] = mapped_column(String)
+    password: Mapped[str]
 
-    profile: Mapped['RemoteProfile'] = relationship(back_populates='github')
+    profile: Mapped['Profile'] = relationship(back_populates='github')
 
     def __repr__(self):
         return f'{self.id}:{self.login}:{self.password}'

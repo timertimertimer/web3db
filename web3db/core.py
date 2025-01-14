@@ -4,16 +4,15 @@ from typing import Union
 from mnemonic import Mnemonic
 from eth_account import Account as EVMAccount
 from aptos_sdk.account import Account as AptosAccount
-from solana.rpc.api import Keypair
+from solders.keypair import Keypair
 from bitcoinutils.hdwallet import HDWallet
 from bitcoinutils.setup import setup
-from sqlalchemy import func, and_, not_, desc, case
+from sqlalchemy import func, and_, not_, desc, case, Select
 from sqlalchemy.future import select
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import selectinload
 
 from web3db.base import BaseDBHelper
 from web3db.models import *
-from web3db.models import RemoteProfile as Profile
 from web3db.utils import my_logger
 from web3db.utils.encrypt_private import encrypt
 
@@ -26,9 +25,9 @@ setup('mainnet')
 class DBHelper(BaseDBHelper):
     async def get_row_by_login(self, login: str, model) -> ModelType | None:
         if model == Proxy:
-            query = select(model).where(model.proxy_string == login).options(joinedload('*'))
+            query = select(model).where(model.proxy_string == login).options(selectinload('*'))
         else:
-            query = select(model).where(model.login == login).options(joinedload('*'))
+            query = select(model).where(model.login == login).options(selectinload('*'))
         result = await self.execute_query(query)
         return result.scalars().first()
 
@@ -50,13 +49,13 @@ class DBHelper(BaseDBHelper):
 
     async def get_profile_by_models_login(self, model: ModelType, login: str) -> Profile:
         my_logger.info(f'Getting {model.__name__} by login - {login}')
-        query = select(Profile).where(model.login == login).options(joinedload('*'))
+        query = select(Profile).where(model.login == login).options(selectinload('*'))
         result = await self.execute_query(query)
         return result.scalars().first()
 
     async def get_random_profile(self) -> Profile:
         my_logger.info(f'Getting random profile')
-        query = select(Profile).order_by(func.random()).options(joinedload('*'))
+        query = select(Profile).order_by(func.random()).options(selectinload('*'))
         result = await self.execute_query(query)
         return result.scalars().first()
 
@@ -76,7 +75,7 @@ class DBHelper(BaseDBHelper):
             select(Profile)
             .join(subquery, subquery.c.id == Profile.id)
             .where(subquery.c.rn == 1)
-            .options(joinedload('*'))
+            .options(selectinload('*'))
             .limit(limit)
         )
         result = await self.execute_query(query)
@@ -107,7 +106,7 @@ class DBHelper(BaseDBHelper):
     async def get_ready_profiles_by_model(self, model: ModelType, limit: int = None) -> list[Profile]:
         my_logger.info(f'Getting ready {model.__name__.lower()} profiles')
         query = (
-            select(Profile).join(model).where(model.ready).options(joinedload('*')).limit(limit).order_by(Profile.id)
+            select(Profile).join(model).where(model.ready).options(selectinload('*')).limit(limit).order_by(Profile.id)
         )
         result = await self.execute_query(query)
         return result.scalars().all()
@@ -124,7 +123,7 @@ class DBHelper(BaseDBHelper):
             select(Profile)
             .join(model)
             .where(model.totp_secret != None)
-            .options(joinedload(getattr(Profile, model.__name__.lower())))
+            .options(selectinload(getattr(Profile, model.__name__.lower())))
             .limit(limit)
             .order_by(Profile.id)
         )
@@ -213,7 +212,7 @@ class DBHelper(BaseDBHelper):
                 select(getattr(Profile, model.__name__.lower() + '_id'))
                 .where(getattr(Profile, model.__name__.lower() + '_id').isnot(None))))
             .order_by(model.id)
-            .options(joinedload(model.email))
+            .options(selectinload(model.email))
             .limit(limit)
         )
         result = await self.execute_query(query)
@@ -269,11 +268,16 @@ class DBHelper(BaseDBHelper):
         return edited_profile
 
     async def get_proxies_by_string(self, s: str):
-        query = select(Proxy).where(Proxy.proxy_string.like(f"%{s}%")).options(joinedload('*'))
+        query = select(Proxy).where(Proxy.proxy_string.like(f"%{s}%")).options(selectinload('*'))
         result = await self.execute_query(query)
         return result.scalars().all()
 
     async def get_profiles_with_shared_proxies(self):
-        query = select(Profile).join(Profile.proxy).where(Proxy.proxy_type == 'shared').options(joinedload('*'))
+        query = select(Profile).join(Profile.proxy).where(Proxy.proxy_type == 'shared').options(selectinload('*'))
+        result = await self.execute_query(query)
+        return result.scalars().all()
+
+    async def get_profiles_with_individual_proxies(self):
+        query = select(Profile).join(Profile.proxy).where(Proxy.proxy_type == 'individual').options(selectinload('*'))
         result = await self.execute_query(query)
         return result.scalars().all()

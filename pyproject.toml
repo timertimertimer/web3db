@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "web3db"
-version = "1.0.6"
+version = "1.0.7"
 description = "Database for web3"
 authors = ["timertimertimer <timerkhan2002@gmail.com>"]
 repository = "https://github.com/timertimertimer/web3db"
@@ -9,19 +9,19 @@ packages = [{include = "web3db"}]
 [tool.poetry.dependencies]
 python = "^3.10"
 base58 = "^2.1.1"
-loguru = "^0.7.2"
-solana = "^0.33.0"
+loguru = "^0.7.3"
 asyncpg = "^0.29.0"
 aptos-sdk = "^0.8.6"
 SQLAlchemy = "^2.0.29"
 eth-account = "^0.13.0"
-python-gnupg = "^0.5.2"
+python-gnupg = "^0.5.3"
 bitcoin-utils = "^0.6.6"
 python-dotenv = "^1.0.1"
 aiosqlite = "^0.20.0"
+alembic = "^1.13.1"
+solders = "^0.23.0"
 
 [tool.poetry.group.dev.dependencies]
-alembic = "^1.13.1"
 bitcoinlib = "^0.6.15"
 
 [build-system]

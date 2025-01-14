@@ -8,12 +8,12 @@ from .mixins import EmailRelationMixin
 
 if TYPE_CHECKING:
     from .profile import Profile
-    from .deposit import ByBitDeposit
+    from .deposit import OkxDeposit
 
 
-class ByBit(EmailRelationMixin, Base):
-    __tablename__ = 'bybits'
-    _email_back_populates = 'bybit'
+class Okx(EmailRelationMixin, Base):
+    __tablename__ = 'okxs'
+    _email_back_populates = 'okx'
     _email_id_nullable = False
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -21,9 +21,10 @@ class ByBit(EmailRelationMixin, Base):
     totp_secret: Mapped[str | None]
     api_key: Mapped[str | None]
     api_secret: Mapped[str | None]
+    api_passphrase: Mapped[str | None]
 
-    profile: Mapped['Profile'] = relationship(back_populates='bybit')
-    deposits: Mapped[list['ByBitDeposit']] = relationship('ByBitDeposit', back_populates='bybit')
+    profile: Mapped['Profile'] = relationship(back_populates='okx')
+    deposits: Mapped[list['OkxDeposit']] = relationship('OkxDeposit', back_populates='okx')
 
     def __repr__(self):
         return f'{self.id}:{self.email.login}:{self.password}'

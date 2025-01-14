@@ -7,11 +7,13 @@ from .base import Base
 
 if TYPE_CHECKING:
     from .discord import Discord
-    from .profile import RemoteProfile
+    from .profile import Profile
     from .twitter import Twitter
     from .github import Github
     from .bybit import ByBit
     from .mexc import Mexc
+    from .okx import Okx
+    from .binance import Binance
 
 
 class Email(Base):
@@ -19,15 +21,17 @@ class Email(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     login: Mapped[str] = mapped_column(String, unique=True)
-    password: Mapped[str] = mapped_column(String)
-    totp_secret: Mapped[str] = mapped_column(String, nullable=True)
+    password: Mapped[str]
+    totp_secret: Mapped[str | None]
 
     discord: Mapped['Discord'] = relationship(back_populates='email')
     twitter: Mapped['Twitter'] = relationship(back_populates='email')
-    profile: Mapped['RemoteProfile'] = relationship(back_populates='email')
+    profile: Mapped['Profile'] = relationship(back_populates='email')
     github: Mapped['Github'] = relationship(back_populates='email')
     bybit: Mapped['ByBit'] = relationship(back_populates='email')
     mexc: Mapped['Mexc'] = relationship(back_populates='email')
+    binance: Mapped['Binance'] = relationship(back_populates='email')
+    okx: Mapped['Okx'] = relationship(back_populates='email')
 
     def __repr__(self):
         return f'{self.id}:{self.login}:{self.password}'

@@ -1,9 +1,12 @@
 from .base import Base
 from .discord import Discord
 from .email import Email
-from .profile import RemoteProfile, LocalProfile
+from .profile import Profile
 from .twitter import Twitter
 from .proxy import Proxy
 from .github import Github
+from .binance import Binance
+from .okx import Okx
 from .bybit import ByBit
 from .mexc import Mexc
+from .deposit import BinanceDeposit, ByBitDeposit, OkxDeposit, MexcDeposit

@@ -9,6 +9,11 @@ if TYPE_CHECKING:
     from .twitter import Twitter
     from .proxy import Proxy
     from .github import Github
+    from .binance import Binance
+    from .bybit import ByBit
+    from .okx import Okx
+    from .mexc import Mexc
+    from .deposit import BinanceDeposit, ByBitDeposit, OkxDeposit, MexcDeposit
 
 
 class EmailRelationMixin:
@@ -81,3 +86,60 @@ class GithubRelationMixin:
     @declared_attr
     def github(cls) -> Mapped['Github']:
         return relationship('Github', back_populates=cls._github_back_populates)
+
+
+class BinanceRelationMixin:
+    _binance_id_nullable: bool = True
+    _binance_back_populates: str = None
+    _binance_id_unique: bool = True
+
+    @declared_attr
+    def binance_id(cls):
+        return mapped_column(ForeignKey('binances.id'), nullable=cls._binance_id_nullable,
+                             unique=cls._binance_id_unique)
+
+    @declared_attr
+    def binance(cls) -> Mapped['Binance']:
+        return relationship('Binance', back_populates=cls._binance_back_populates)
+
+
+class ByBitRelationMixin:
+    _bybit_id_nullable: bool = True
+    _bybit_back_populates: str = None
+    _bybit_id_unique: bool = True
+
+    @declared_attr
+    def bybit_id(cls):
+        return mapped_column(ForeignKey('bybits.id'), nullable=cls._bybit_id_nullable, unique=cls._bybit_id_unique)
+
+    @declared_attr
+    def bybit(cls) -> Mapped['ByBit']:
+        return relationship('ByBit', back_populates=cls._bybit_back_populates)
+
+
+class OkxRelationMixin:
+    _okx_id_nullable: bool = True
+    _okx_back_populates: str = None
+    _okx_id_unique: bool = True
+
+    @declared_attr
+    def okx_id(cls):
+        return mapped_column(ForeignKey('okxs.id'), nullable=cls._okx_id_nullable, unique=cls._okx_id_unique)
+
+    @declared_attr
+    def okx(cls) -> Mapped['Okx']:
+        return relationship('Okx', back_populates=cls._okx_back_populates)
+
+
+class MexcRelationMixin:
+    _mexc_id_nullable: bool = True
+    _mexc_back_populates: str = None
+    _mexc_id_unique: bool = True
+
+    @declared_attr
+    def mexc_id(cls):
+        return mapped_column(ForeignKey('mexcs.id'), nullable=cls._mexc_id_nullable, unique=cls._mexc_id_unique)
+
+    @declared_attr
+    def mexc(cls) -> Mapped['Mexc']:
+        return relationship('Mexc', back_populates=cls._mexc_back_populates)

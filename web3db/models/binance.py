@@ -8,12 +8,12 @@ from .mixins import EmailRelationMixin
 
 if TYPE_CHECKING:
     from .profile import Profile
-    from .deposit import ByBitDeposit
+    from .deposit import BinanceDeposit
 
 
-class ByBit(EmailRelationMixin, Base):
-    __tablename__ = 'bybits'
-    _email_back_populates = 'bybit'
+class Binance(EmailRelationMixin, Base):
+    __tablename__ = 'binances'
+    _email_back_populates = 'binance'
     _email_id_nullable = False
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -22,8 +22,8 @@ class ByBit(EmailRelationMixin, Base):
     api_key: Mapped[str | None]
     api_secret: Mapped[str | None]
 
-    profile: Mapped['Profile'] = relationship(back_populates='bybit')
-    deposits: Mapped[list['ByBitDeposit']] = relationship('ByBitDeposit', back_populates='bybit')
+    profile: Mapped['Profile'] = relationship(back_populates='binance')
+    deposits: Mapped[list['BinanceDeposit']] = relationship('BinanceDeposit', back_populates='binance')
 
     def __repr__(self):
         return f'{self.id}:{self.email.login}:{self.password}'
