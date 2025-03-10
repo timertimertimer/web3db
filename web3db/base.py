@@ -1,6 +1,6 @@
 from typing import Type
 
-from sqlalchemy import Select, Delete, Update, Result, delete, select
+from sqlalchemy import Select, Delete, Update, Result, delete, select, inspect
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, selectinload
@@ -23,10 +23,11 @@ class BaseDBHelper:
             await conn.run_sync(base.metadata.create_all)
 
     async def add_record(self, record: type(DeclarativeBase) | list) -> type(DeclarativeBase) | None:
-        if self.query_echo:
-            if not record:
+        if not record:
+            if self.query_echo:
                 my_logger.info(f'Nothing to add. Record - {record}')
-                return
+            return
+        if self.query_echo:
             if isinstance(record, list):
                 my_logger.info(f'Adding rows {[el.id for el in record]} in "{record[0].__tablename__}" table')
             else:
@@ -91,5 +92,19 @@ class BaseDBHelper:
         if self.query_echo:
             my_logger.info(f'Getting rows with {", ".join(map(str, ids))} ids from "{model.__tablename__}" table')
         query = select(model).filter(model.id.in_(ids)).order_by(model.id).options(selectinload('*'))
+        result = await self.execute_query(query)
+        return result.scalars().unique().all()
+
+    async def get_rows_by_filter(
+            self, filter_value: list, model: type(DeclarativeBase), column
+    ) -> list[type(DeclarativeBase)]:
+        if self.query_echo:
+            my_logger.info(
+                f'Getting rows with {", ".join(map(str, filter_value))} from '
+                f'"{model.__tablename__}" table based on column {column.name}'
+            )
+        if column not in list(inspect(model).columns):
+            raise ValueError(f"Column '{column}' not found in model '{model.__tablename__}'")
+        query = select(model).filter(column.in_(filter_value)).order_by(column).options(selectinload('*'))
         result = await self.execute_query(query)
         return result.scalars().unique().all()
