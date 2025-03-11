@@ -23,6 +23,8 @@ class Email(Base):
     login: Mapped[str] = mapped_column(String, unique=True)
     password: Mapped[str]
     totp_secret: Mapped[str | None]
+    refresh_token: Mapped[str | None]
+    client_id: Mapped[str | None]
 
     discord: Mapped['Discord'] = relationship(back_populates='email')
     twitter: Mapped['Twitter'] = relationship(back_populates='email')
