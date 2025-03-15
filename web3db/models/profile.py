@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import String, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship, declared_attr
 
-from .base import Base
+from .base import Base, BaseModel
 from .mixins import (
     EmailRelationMixin,
     TwitterRelationMixin,
@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 
 
 class Profile(
+    BaseModel,
     EmailRelationMixin,
     TwitterRelationMixin, DiscordRelationMixin, GithubRelationMixin,
     BinanceRelationMixin, ByBitRelationMixin, OkxRelationMixin, MexcRelationMixin,

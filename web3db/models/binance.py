@@ -1,9 +1,8 @@
 from typing import TYPE_CHECKING
 
-from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from .base import Base
+from .base import Base, SocialBaseModel
 from .mixins import EmailRelationMixin
 
 if TYPE_CHECKING:
@@ -11,13 +10,12 @@ if TYPE_CHECKING:
     from .deposit import BinanceDeposit
 
 
-class Binance(EmailRelationMixin, Base):
+class Binance(SocialBaseModel, EmailRelationMixin, Base):
     __tablename__ = 'binances'
     _email_back_populates = 'binance'
     _email_id_nullable = False
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    password: Mapped[str]
     totp_secret: Mapped[str | None]
     api_key: Mapped[str | None]
     api_secret: Mapped[str | None]

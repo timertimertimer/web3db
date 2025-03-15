@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import String, UniqueConstraint, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from .base import Base
+from .base import Base, BaseModel
 from .mixins import (
     BinanceRelationMixin,
     ByBitRelationMixin,
@@ -29,7 +29,7 @@ class Deposit:
     )
 
 
-class BinanceDeposit(Deposit, BinanceRelationMixin, Base):
+class BinanceDeposit(BaseModel, Deposit, BinanceRelationMixin, Base):
     __tablename__ = 'binance_deposits'
     _binance_back_populates = 'deposits'
     _binance_id_nullable = False
@@ -38,7 +38,7 @@ class BinanceDeposit(Deposit, BinanceRelationMixin, Base):
     profile: Mapped['Profile'] = relationship(back_populates='binance_deposit')
 
 
-class ByBitDeposit(Deposit, ByBitRelationMixin, Base):
+class ByBitDeposit(BaseModel, Deposit, ByBitRelationMixin, Base):
     __tablename__ = 'bybit_deposits'
     _bybit_back_populates = 'deposits'
     _bybit_id_nullable = False
@@ -47,7 +47,7 @@ class ByBitDeposit(Deposit, ByBitRelationMixin, Base):
     profile: Mapped['Profile'] = relationship(back_populates='bybit_deposit')
 
 
-class OkxDeposit(Deposit, OkxRelationMixin, Base):
+class OkxDeposit(BaseModel, Deposit, OkxRelationMixin, Base):
     __tablename__ = 'okx_deposits'
     _okx_back_populates = 'deposits'
     _okx_id_nullable = False
@@ -56,7 +56,7 @@ class OkxDeposit(Deposit, OkxRelationMixin, Base):
     profile: Mapped['Profile'] = relationship(back_populates='okx_deposit')
 
 
-class MexcDeposit(Deposit, MexcRelationMixin, Base):
+class MexcDeposit(BaseModel, Deposit, MexcRelationMixin, Base):
     __tablename__ = 'mexc_deposits'
     _mexc_back_populates = 'deposits'
     _mexc_id_nullable = False

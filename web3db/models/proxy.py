@@ -3,13 +3,13 @@ from typing import TYPE_CHECKING
 from sqlalchemy import String, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from .base import Base
+from .base import Base, BaseModel
 
 if TYPE_CHECKING:
     from .profile import Profile
 
 
-class Proxy(Base):
+class Proxy(BaseModel, Base):
     __tablename__ = 'proxies'
     __table_args__ = (
         CheckConstraint("proxy_type IN ('shared', 'individual')"),

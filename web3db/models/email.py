@@ -1,9 +1,10 @@
+from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import String
+from sqlalchemy import String, DateTime, event
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from .base import Base
+from .base import Base, SocialBaseModel
 
 if TYPE_CHECKING:
     from .discord import Discord
@@ -16,15 +17,16 @@ if TYPE_CHECKING:
     from .binance import Binance
 
 
-class Email(Base):
+class Email(SocialBaseModel, Base):
     __tablename__ = 'emails'
 
     id: Mapped[int] = mapped_column(primary_key=True)
     login: Mapped[str] = mapped_column(String, unique=True)
-    password: Mapped[str]
     totp_secret: Mapped[str | None]
     refresh_token: Mapped[str | None]
+    access_token: Mapped[str | None]
     client_id: Mapped[str | None]
+    access_token_updated_at: Mapped[datetime] = mapped_column(DateTime, onupdate=datetime.utcnow, nullable=True)
 
     discord: Mapped['Discord'] = relationship(back_populates='email')
     twitter: Mapped['Twitter'] = relationship(back_populates='email')

@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from .base import Base
+from .base import Base, SocialBaseModel
 from .mixins import EmailRelationMixin
 
 if TYPE_CHECKING:
@@ -11,13 +11,12 @@ if TYPE_CHECKING:
     from .deposit import MexcDeposit
 
 
-class Mexc(EmailRelationMixin, Base):
+class Mexc(SocialBaseModel, EmailRelationMixin, Base):
     __tablename__ = 'mexcs'
     _email_back_populates = 'mexc'
     _email_id_nullable = False
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    password: Mapped[str]
     totp_secret: Mapped[str | None]
 
     profile: Mapped['Profile'] = relationship(back_populates='mexc')
