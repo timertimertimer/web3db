@@ -26,6 +26,7 @@ class Email(SocialBaseModel, Base):
     refresh_token: Mapped[str | None]
     access_token: Mapped[str | None]
     client_id: Mapped[str | None]
+    client_secret: Mapped[str | None]
     access_token_updated_at: Mapped[datetime] = mapped_column(DateTime, onupdate=datetime.utcnow, nullable=True)
 
     discord: Mapped['Discord'] = relationship(back_populates='email')
