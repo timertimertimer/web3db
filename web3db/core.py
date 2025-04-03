@@ -7,7 +7,7 @@ from aptos_sdk.account import Account as AptosAccount
 from solders.keypair import Keypair
 from bitcoinutils.hdwallet import HDWallet
 from bitcoinutils.setup import setup
-from sqlalchemy import func, and_, not_, desc, case, Select
+from sqlalchemy import func, and_, not_, desc, case, Select, union
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
@@ -15,8 +15,12 @@ from web3db.base import BaseDBHelper
 from web3db.models import *
 from web3db.utils import my_logger
 from web3db.utils.encrypt_private import encrypt
+from web3db.utils.env import Web3dbENV
 
 ModelType = Union[type(Email), type(Discord), type(Twitter), type(Github), type(Proxy), type(Profile)]
+EmailUsedModelType = Union[
+    type(Binance), type(ByBit), type(Discord), type(Github), type(Mexc), type(Okx), type(Profile), type(Twitter),
+]
 INDIVIDUAL_PROXY_LIMIT = 3
 SHARED_PROXY_LIMIT = 1
 setup('mainnet')
@@ -281,3 +285,22 @@ class DBHelper(BaseDBHelper):
         query = select(Profile).join(Profile.proxy).where(Proxy.proxy_type == 'individual').options(selectinload('*'))
         result = await self.execute_query(query)
         return result.scalars().all()
+
+    async def get_not_used_emails(self, models: list[EmailUsedModelType], not_ru: bool = True):
+        subqueries = [
+            select(model.email_id).where(model.email_id.isnot(None))
+            for model in models
+        ]
+        union_query = union(*subqueries).subquery()
+        query = select(Email).where(~Email.id.in_(select(union_query)))
+        if not_ru:
+            query = query.where(~Email.login.ilike('%.ru'))
+        result = await self.execute_query(query)
+        return result.scalars().all()
+
+
+def create_db_instance(
+        connection_string: str = Web3dbENV.LOCAL_CONNECTION_STRING, engine_echo: bool = False, query_echo: bool = False
+) -> DBHelper:
+    db = DBHelper(connection_string, engine_echo=engine_echo, query_echo=query_echo)
+    return db
