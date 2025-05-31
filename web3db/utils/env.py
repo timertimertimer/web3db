@@ -1,19 +1,21 @@
-import os
+from pathlib import Path
+
 from dotenv import load_dotenv
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 load_dotenv()
 
 
-class Web3dbENV:
-    PASSPHRASE = os.getenv("PASSPHRASE")
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=Path(__file__).parent.parent / ".env", env_file_encoding="utf-8", extra="ignore"
+    )
+    PASSPHRASE: str
 
-    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-    CAPMONSTER_API_KEY = os.getenv("CAPMONSTER_API_KEY")
+    OPENAI_API_KEY: str
+    CAPMONSTER_API_KEY: str
 
-    POSTGRES_HOST = os.getenv("POSTGRES_HOST")
-    POSTGRES_PORT = os.getenv("POSTGRES_PORT")
-    POSTGRES_DB = os.getenv("POSTGRES_DB")
-    POSTGRES_USER = os.getenv("POSTGRES_USER")
-    POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
-    REMOTE_CONNECTION_STRING = os.getenv("REMOTE_CONNECTION_STRING")
-    LOCAL_CONNECTION_STRING = os.getenv("LOCAL_CONNECTION_STRING")
+    CONNECTION_STRING: str
+
+
+settings = Settings()

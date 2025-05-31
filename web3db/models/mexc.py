@@ -18,6 +18,8 @@ class Mexc(SocialBaseModel, EmailRelationMixin, Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     totp_secret: Mapped[str | None]
+    api_key: Mapped[str | None]
+    api_secret: Mapped[str | None]
 
     profile: Mapped['Profile'] = relationship(back_populates='mexc')
     deposits: Mapped[list['MexcDeposit']] = relationship('MexcDeposit', back_populates='mexc')

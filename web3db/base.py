@@ -1,6 +1,6 @@
 from typing import Type
 
-from sqlalchemy import Select, Delete, Update, Result, delete, select, inspect
+from sqlalchemy import Select, Delete, Update, Result, delete, select, inspect, TextClause
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, selectinload
@@ -45,7 +45,7 @@ class BaseDBHelper:
                 if self.query_echo:
                     my_logger.debug(e)
 
-    async def execute_query(self, stmt: Select | Delete | Update | list[Select | Delete | Update]) -> Result:
+    async def execute_query(self, stmt: Select | Delete | Update | list[Select | Delete | Update] | TextClause) -> Result:
         if self.query_echo:
             my_logger.info(stmt)
         async with self.session_factory() as session:

@@ -1,11 +1,12 @@
 import asyncio
 import csv
 from pathlib import Path
+
 from web3db import *
-from web3db.utils.env import Web3dbENV
+from web3db.core import create_db_instance
 
 data_folder = Path.cwd() / 'data'
-db = DBHelper(Web3dbENV.REMOTE_CONNECTION_STRING)
+db = create_db_instance()
 cexs = {
     'bybits.csv': ByBit,
     'mexcs.csv': Mexc
