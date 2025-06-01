@@ -8,7 +8,7 @@ from .mixins import (
     BinanceRelationMixin,
     ByBitRelationMixin,
     OkxRelationMixin,
-    MexcRelationMixin
+    MexcRelationMixin, BitgetRelationMixin
 )
 
 if TYPE_CHECKING:
@@ -63,3 +63,12 @@ class MexcDeposit(BaseModel, Deposit, MexcRelationMixin, Base):
     _mexc_id_unique = False
 
     profile: Mapped['Profile'] = relationship(back_populates='mexc_deposit')
+
+
+class BitgetDeposit(BaseModel, Deposit, BitgetRelationMixin, Base):
+    __tablename__ = 'bitget_deposits'
+    _bitget_back_populates = 'deposits'
+    _bitget_id_nullable = False
+    _bitget_id_unique = False
+
+    profile: Mapped['Profile'] = relationship(back_populates='bitget_deposit')

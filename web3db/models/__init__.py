@@ -9,4 +9,5 @@ from .binance import Binance
 from .okx import Okx
 from .bybit import ByBit
 from .mexc import Mexc
-from .deposit import BinanceDeposit, ByBitDeposit, OkxDeposit, MexcDeposit
+from .bitget import Bitget
+from .deposit import BinanceDeposit, ByBitDeposit, OkxDeposit, MexcDeposit, BitgetDeposit

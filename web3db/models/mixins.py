@@ -13,7 +13,6 @@ if TYPE_CHECKING:
     from .bybit import ByBit
     from .okx import Okx
     from .mexc import Mexc
-    from .deposit import BinanceDeposit, ByBitDeposit, OkxDeposit, MexcDeposit
 
 
 class EmailRelationMixin:
@@ -143,3 +142,17 @@ class MexcRelationMixin:
     @declared_attr
     def mexc(cls) -> Mapped['Mexc']:
         return relationship('Mexc', back_populates=cls._mexc_back_populates)
+
+
+class BitgetRelationMixin:
+    _bitget_id_nullable: bool = True
+    _bitget_back_populates: str = None
+    _bitget_id_unique: bool = True
+
+    @declared_attr
+    def bitget_id(cls):
+        return mapped_column(ForeignKey('bitgets.id'), nullable=cls._bitget_id_nullable, unique=cls._bitget_id_unique)
+
+    @declared_attr
+    def bitget(cls) -> Mapped['Bitget']:
+        return relationship('Bitget', back_populates=cls._bitget_back_populates)
