@@ -15,7 +15,6 @@ from web3db.base import BaseDBHelper
 from web3db.models import *
 from web3db.utils import my_logger
 from web3db.utils.encrypt_private import encrypt
-from web3db.utils.env import settings
 
 ModelType = Union[type(Email), type(Discord), type(Twitter), type(Github), type(Proxy), type(Profile)]
 EmailUsedModelType = Union[
@@ -300,7 +299,9 @@ class DBHelper(BaseDBHelper):
 
 
 def create_db_instance(
-        connection_string: str = settings.CONNECTION_STRING, engine_echo: bool = False, query_echo: bool = False
+        connection_string: str = None, engine_echo: bool = False, query_echo: bool = False
 ) -> DBHelper:
+    from web3db.utils.env import settings
+    connection_string = connection_string or settings.CONNECTION_STRING
     db = DBHelper(connection_string, engine_echo=engine_echo, query_echo=query_echo)
     return db
