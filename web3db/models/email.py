@@ -15,10 +15,11 @@ if TYPE_CHECKING:
     from .mexc import Mexc
     from .okx import Okx
     from .binance import Binance
+    from .bitget import Bitget
 
 
 class Email(SocialBaseModel, Base):
-    __tablename__ = 'emails'
+    __tablename__ = "emails"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     login: Mapped[str] = mapped_column(String, unique=True)
@@ -27,19 +28,22 @@ class Email(SocialBaseModel, Base):
     access_token: Mapped[str | None]
     client_id: Mapped[str | None]
     client_secret: Mapped[str | None]
-    access_token_updated_at: Mapped[datetime] = mapped_column(DateTime, onupdate=datetime.utcnow, nullable=True)
+    access_token_updated_at: Mapped[datetime] = mapped_column(
+        DateTime, onupdate=datetime.utcnow, nullable=True
+    )
 
-    discord: Mapped['Discord'] = relationship(back_populates='email')
-    twitter: Mapped['Twitter'] = relationship(back_populates='email')
-    profile: Mapped['Profile'] = relationship(back_populates='email')
-    github: Mapped['Github'] = relationship(back_populates='email')
-    bybit: Mapped['ByBit'] = relationship(back_populates='email')
-    mexc: Mapped['Mexc'] = relationship(back_populates='email')
-    binance: Mapped['Binance'] = relationship(back_populates='email')
-    okx: Mapped['Okx'] = relationship(back_populates='email')
+    discord: Mapped["Discord"] = relationship(back_populates="email")
+    twitter: Mapped["Twitter"] = relationship(back_populates="email")
+    profile: Mapped["Profile"] = relationship(back_populates="email")
+    github: Mapped["Github"] = relationship(back_populates="email")
+    bybit: Mapped["ByBit"] = relationship(back_populates="email")
+    mexc: Mapped["Mexc"] = relationship(back_populates="email")
+    binance: Mapped["Binance"] = relationship(back_populates="email")
+    okx: Mapped["Okx"] = relationship(back_populates="email")
+    bitget: Mapped["Bitget"] = relationship(back_populates="email")
 
     def __repr__(self):
-        return f'{self.id}:{self.login}:{self.password}'
+        return f"{self.id}:{self.login}:{self.password}"
 
     def __str__(self):
         return repr(self)
