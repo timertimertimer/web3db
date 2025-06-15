@@ -18,7 +18,13 @@ from .mixins import (
 )
 
 if TYPE_CHECKING:
-    from .deposit import BinanceDeposit, ByBitDeposit, OkxDeposit, MexcDeposit
+    from .deposit import (
+        BinanceDeposit,
+        ByBitDeposit,
+        OkxDeposit,
+        MexcDeposit,
+        BitgetDeposit,
+    )
 
 
 class Profile(
@@ -84,6 +90,13 @@ class Profile(
     )
     mexc_deposit: Mapped["MexcDeposit"] = relationship(
         "MexcDeposit", back_populates="profile"
+    )
+
+    bitget_deposit_id: Mapped[int | None] = mapped_column(
+        ForeignKey("bitget_deposits.id"), nullable=True, unique=True
+    )
+    bitget_deposits: Mapped["BitgetDeposit"] = relationship(
+        "BitgetDeposit", back_populates="profile"
     )
 
     def __repr__(self):
