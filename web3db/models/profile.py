@@ -95,7 +95,7 @@ class Profile(
     bitget_deposit_id: Mapped[int | None] = mapped_column(
         ForeignKey("bitget_deposits.id"), nullable=True, unique=True
     )
-    bitget_deposits: Mapped["BitgetDeposit"] = relationship(
+    bitget_deposit: Mapped["BitgetDeposit"] = relationship(
         "BitgetDeposit", back_populates="profile"
     )
 
