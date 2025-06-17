@@ -2,11 +2,10 @@ import gnupg
 
 from .logger import logger
 
-gpg = gnupg.GPG()
-gpg.encoding = 'utf-8'
-
 
 def encrypt(data: str, passphrase: str, recipient: str) -> str:
+    gpg = gnupg.GPG()
+    gpg.encoding = 'utf-8'
     status = gpg.encrypt(
         data=data,
         recipients=recipient,
@@ -18,6 +17,8 @@ def encrypt(data: str, passphrase: str, recipient: str) -> str:
 
 
 def decrypt(encoded_data: str, passphrase: str, echo: bool = False) -> str:
+    gpg = gnupg.GPG()
+    gpg.encoding = 'utf-8'
     status = gpg.decrypt(encoded_data, passphrase=passphrase)
     if echo:
         logger.info(status.status)
